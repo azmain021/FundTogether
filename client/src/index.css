@@ -1,0 +1,105 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-width: 320px;
+    background: #ffffff;
+    color: #102a43;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a,
+  button {
+    outline-color: #059669;
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: #bdebdc;
+    color: #102a43;
+  }
+}
+
+@layer components {
+  .page-container {
+    width: min(100% - 40px, 1240px);
+    margin-inline: auto;
+  }
+
+  .nav-link {
+    color: #334e68;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: color 180ms ease;
+  }
+
+  .nav-link:hover {
+    color: #059669;
+  }
+
+  .eyebrow {
+    color: #059669;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .section-title {
+    max-width: 720px;
+    color: #102a43;
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1.16;
+  }
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(16, 42, 67, 0.023) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 42, 67, 0.023) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.cta-pattern {
+  background-image:
+    radial-gradient(circle at 15% 110%, rgba(5, 150, 105, 0.3), transparent 34%),
+    linear-gradient(110deg, #102a43, #0b2942);
+}
+
+@media (max-width: 640px) {
+  .page-container {
+    width: min(100% - 30px, 1240px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.page-container {
+  width: min(100% - 40px, 1240px);
+  margin-left: auto;
+  margin-right: auto;
+}
