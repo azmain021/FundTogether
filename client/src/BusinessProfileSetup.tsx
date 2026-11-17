@@ -1,4 +1,13 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ApiError } from "./api/client";
+import { createBusiness, getBusiness, updateBusiness } from "./api/businesses";
+import type {
+  Business,
+  BusinessInput,
+  BusinessSector,
+  BusinessSize,
+  BusinessType,
+} from "./api/types";
 
 type IconProps = { className?: string };
 
@@ -67,21 +76,110 @@ const Close = ({ className = "h-6 w-6" }: IconProps) => (
   </svg>
 );
 
-const categories = [
-  "Grocery / Retail",
-  "Restaurant / Food",
-  "Bakery",
-  "Clothing / Fashion",
-  "Agriculture / Poultry / Dairy / Fisheries",
-  "Manufacturing",
-  "Renewable Energy",
-  "Transportation / Delivery",
-  "Other",
+type Option<T extends string> = { value: T; label: string };
+
+const businessTypes: Option<BusinessType>[] = [
+  { value: "sole_proprietorship", label: "Sole Proprietorship" },
+  { value: "partnership", label: "Partnership" },
+  { value: "private_limited", label: "Private Limited Company" },
+  { value: "cooperative", label: "Cooperative" },
+  { value: "other", label: "Other" },
 ];
 
-const businessSizes = ["Micro Business", "Small Business", "Medium Business", "Large Business"];
+const sectors: Option<BusinessSector>[] = [
+  { value: "grocery_retail", label: "Grocery / Retail" },
+  { value: "restaurant_food", label: "Restaurant / Food" },
+  { value: "bakery", label: "Bakery" },
+  { value: "clothing_fashion", label: "Clothing / Fashion" },
+  { value: "agriculture", label: "Agriculture / Poultry / Dairy / Fisheries" },
+  { value: "manufacturing", label: "Manufacturing" },
+  { value: "renewable_energy", label: "Renewable Energy" },
+  { value: "transportation_delivery", label: "Transportation / Delivery" },
+  { value: "other", label: "Other" },
+];
 
-const employeeRanges = ["1–5", "6–20", "21–50", "51–100", "More than 100"];
+const businessSizes: Option<BusinessSize>[] = [
+  { value: "micro", label: "Micro Business" },
+  { value: "small", label: "Small Business" },
+  { value: "medium", label: "Medium Business" },
+  { value: "large", label: "Large Business" },
+];
+
+// Until sign-in exists there is no GET /businesses/me, so the saved profile's ID
+// is remembered in this browser to reload it from the server after a refresh.
+const SAVED_BUSINESS_KEY = "fundtogether.businessId";
+
+const readSavedBusinessId = () => {
+  try {
+    return window.localStorage.getItem(SAVED_BUSINESS_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeSavedBusinessId = (id: string | null) => {
+  try {
+    if (id) window.localStorage.setItem(SAVED_BUSINESS_KEY, id);
+    else window.localStorage.removeItem(SAVED_BUSINESS_KEY);
+  } catch {
+    // Storage unavailable (private mode); the profile is still saved on the server.
+  }
+};
+
+const emptyForm = {
+  officialName: "",
+  businessType: "",
+  sector: "",
+  size: "",
+  establishedYear: "",
+  operatingHistory: "",
+  division: "",
+  district: "",
+  address: "",
+  description: "",
+  employeeCount: "",
+  website: "",
+  businessEmail: "",
+  contactPhone: "",
+};
+
+type ProfileForm = typeof emptyForm;
+
+const toForm = (business: Business): ProfileForm => ({
+  officialName: business.officialName,
+  businessType: business.businessType,
+  sector: business.sector,
+  size: business.size,
+  establishedYear: String(business.establishedYear),
+  operatingHistory: business.operatingHistory ?? "",
+  division: business.division,
+  district: business.district,
+  address: business.address,
+  description: business.description,
+  employeeCount: String(business.employeeCount),
+  website: business.website ?? "",
+  businessEmail: business.businessEmail,
+  contactPhone: business.contactPhone,
+});
+
+const toInput = (form: ProfileForm): BusinessInput => ({
+  officialName: form.officialName,
+  businessType: form.businessType as BusinessType,
+  sector: form.sector as BusinessSector,
+  size: form.size as BusinessSize,
+  establishedYear: Number(form.establishedYear),
+  employeeCount: Number(form.employeeCount),
+  division: form.division,
+  district: form.district,
+  address: form.address,
+  description: form.description,
+  businessEmail: form.businessEmail,
+  contactPhone: form.contactPhone,
+  ...(form.operatingHistory.trim() ? { operatingHistory: form.operatingHistory } : {}),
+  ...(form.website.trim() ? { website: form.website } : {}),
+});
+
+type Feedback = { tone: "success" | "error"; text: string; details?: string[] } | null;
 
 const steps = [
   {
@@ -185,7 +283,7 @@ function SelectField({
   id: string;
   label: string;
   placeholder: string;
-  options: string[];
+  options: Option<string>[];
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -202,7 +300,9 @@ function SelectField({
           {placeholder}
         </option>
         {options.map((option) => (
-          <option key={option}>{option}</option>
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
         ))}
       </select>
     </FieldShell>
@@ -233,32 +333,69 @@ function StepMarker({ state, number }: { state: (typeof steps)[number]["state"];
 
 export default function BusinessProfileSetup() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [form, setForm] = useState({
-    businessName: "",
-    category: "",
-    size: "",
-    established: "",
-    division: "",
-    district: "",
-    address: "",
-    description: "",
-    employees: "",
-    website: "",
-    email: "",
-    phone: "",
-  });
+  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [form, setForm] = useState<ProfileForm>(emptyForm);
+  const [businessId, setBusinessId] = useState<string | null>(readSavedBusinessId);
+  const [loading, setLoading] = useState(businessId !== null);
+  const [saving, setSaving] = useState(false);
 
-  const updateField = (field: keyof typeof form, value: string) => {
+  // Reload a previously saved profile from the server (proves it persisted).
+  useEffect(() => {
+    if (!businessId) return;
+    const controller = new AbortController();
+    getBusiness(businessId, controller.signal)
+      .then((business) => setForm(toForm(business)))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
+          writeSavedBusinessId(null);
+          setBusinessId(null);
+          return;
+        }
+        setFeedback({
+          tone: "error",
+          text: error instanceof Error ? error.message : "Could not load your saved profile.",
+        });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+    // Only on first load; later saves update the form directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateField = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
-    setMessage("");
+    setFeedback(null);
   };
 
-  const saveProfile = (event: FormEvent<HTMLFormElement>) => {
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(
-      `Business profile for ${form.businessName} is ready for this demonstration. Document Submission is the next onboarding step; no information has been sent to a server.`,
-    );
+    if (saving) return;
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const input = toInput(form);
+      const saved = businessId
+        ? await updateBusiness(businessId, input)
+        : await createBusiness(input);
+      writeSavedBusinessId(saved._id);
+      setBusinessId(saved._id);
+      setForm(toForm(saved));
+      setFeedback({
+        tone: "success",
+        text: `Business profile for ${saved.officialName} has been saved. Document Submission is the next onboarding step.`,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "The profile could not be saved.",
+        details: error instanceof ApiError ? error.details : undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -427,23 +564,38 @@ export default function BusinessProfileSetup() {
                   </p>
                 </div>
 
-                <form onSubmit={saveProfile} className="mt-7">
+                <form onSubmit={saveProfile} className="mt-7" aria-busy={loading || saving}>
+                  {loading && (
+                    <p className="mb-5 text-xs font-semibold text-[#526B82]" role="status">
+                      Loading your saved profile…
+                    </p>
+                  )}
                   <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
-                    <TextField
-                      id="official-business-name"
-                      label="Official Business Name"
-                      placeholder="Enter the registered business name"
-                      value={form.businessName}
-                      onChange={(value) => updateField("businessName", value)}
-                      autoComplete="organization"
+                    <div className="sm:col-span-2">
+                      <TextField
+                        id="official-business-name"
+                        label="Official Business Name"
+                        placeholder="Enter the registered business name"
+                        value={form.officialName}
+                        onChange={(value) => updateField("officialName", value)}
+                        autoComplete="organization"
+                      />
+                    </div>
+                    <SelectField
+                      id="business-type"
+                      label="Business Type"
+                      placeholder="Select the legal form"
+                      options={businessTypes}
+                      value={form.businessType}
+                      onChange={(value) => updateField("businessType", value)}
                     />
                     <SelectField
-                      id="business-category"
-                      label="Business Category"
-                      placeholder="Select a category"
-                      options={categories}
-                      value={form.category}
-                      onChange={(value) => updateField("category", value)}
+                      id="business-sector"
+                      label="Business Sector"
+                      placeholder="Select a sector"
+                      options={sectors}
+                      value={form.sector}
+                      onChange={(value) => updateField("sector", value)}
                     />
                     <SelectField
                       id="business-size"
@@ -458,8 +610,8 @@ export default function BusinessProfileSetup() {
                       label="Year Established"
                       type="number"
                       placeholder="For example, 2018"
-                      value={form.established}
-                      onChange={(value) => updateField("established", value)}
+                      value={form.establishedYear}
+                      onChange={(value) => updateField("establishedYear", value)}
                     />
 
                     <div className="sm:col-span-2">
@@ -508,17 +660,33 @@ export default function BusinessProfileSetup() {
                         className="w-full resize-y rounded-xl border border-[#CBD5E1] bg-white px-4 py-3 text-sm leading-6 text-[#102A43] outline-none transition placeholder:text-[#9FB3C8] focus:border-[#059669] focus:ring-4 focus:ring-[#059669]/10"
                       />
                       <span className="mt-1.5 block text-[10px] text-[#829AB1]">
-                        A concise overview helps reviewers understand your day-to-day operations.
+                        A concise overview (at least 20 characters) helps reviewers understand your
+                        day-to-day operations.
                       </span>
                     </label>
 
-                    <SelectField
+                    <label htmlFor="operating-history" className="block sm:col-span-2">
+                      <span className="mb-2 block text-xs font-bold text-[#334E68]">
+                        Operating History (Optional)
+                      </span>
+                      <textarea
+                        id="operating-history"
+                        value={form.operatingHistory}
+                        onChange={(event) => updateField("operatingHistory", event.target.value)}
+                        rows={3}
+                        maxLength={1000}
+                        placeholder="Key milestones, such as when you opened, expanded or changed what you offer."
+                        className="w-full resize-y rounded-xl border border-[#CBD5E1] bg-white px-4 py-3 text-sm leading-6 text-[#102A43] outline-none transition placeholder:text-[#9FB3C8] focus:border-[#059669] focus:ring-4 focus:ring-[#059669]/10"
+                      />
+                    </label>
+
+                    <TextField
                       id="number-of-employees"
                       label="Number of Employees"
-                      placeholder="Select an employee range"
-                      options={employeeRanges}
-                      value={form.employees}
-                      onChange={(value) => updateField("employees", value)}
+                      type="number"
+                      placeholder="For example, 12"
+                      value={form.employeeCount}
+                      onChange={(value) => updateField("employeeCount", value)}
                     />
                     <TextField
                       id="business-website"
@@ -535,8 +703,8 @@ export default function BusinessProfileSetup() {
                       label="Business Contact Email"
                       type="email"
                       placeholder="contact@yourbusiness.com"
-                      value={form.email}
-                      onChange={(value) => updateField("email", value)}
+                      value={form.businessEmail}
+                      onChange={(value) => updateField("businessEmail", value)}
                       autoComplete="email"
                     />
                     <TextField
@@ -544,8 +712,8 @@ export default function BusinessProfileSetup() {
                       label="Business Contact Phone Number"
                       type="tel"
                       placeholder="+880 1XXX-XXXXXX"
-                      value={form.phone}
-                      onChange={(value) => updateField("phone", value)}
+                      value={form.contactPhone}
+                      onChange={(value) => updateField("contactPhone", value)}
                       autoComplete="tel"
                     />
                   </div>
@@ -557,13 +725,24 @@ export default function BusinessProfileSetup() {
                     </p>
                   </div>
 
-                  {message && (
+                  {feedback && (
                     <div
-                      className="mt-5 rounded-xl border border-[#BDE8D9] bg-[#ECFDF5] p-4 text-xs font-semibold leading-5 text-[#047857]"
-                      role="status"
+                      className={`mt-5 rounded-xl border p-4 text-xs font-semibold leading-5 ${
+                        feedback.tone === "success"
+                          ? "border-[#BDE8D9] bg-[#ECFDF5] text-[#047857]"
+                          : "border-[#F5C2C0] bg-[#FEF2F2] text-[#B42318]"
+                      }`}
+                      role={feedback.tone === "error" ? "alert" : "status"}
                       aria-live="polite"
                     >
-                      {message}
+                      {feedback.text}
+                      {feedback.details && feedback.details.length > 0 && (
+                        <ul className="mt-2 list-disc space-y-1 pl-5 font-medium">
+                          {feedback.details.map((detail) => (
+                            <li key={detail}>{detail}</li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   )}
 
@@ -576,9 +755,11 @@ export default function BusinessProfileSetup() {
                     </a>
                     <button
                       type="submit"
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#059669] px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,.2)] transition hover:bg-[#047857]"
+                      disabled={loading || saving}
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#059669] px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,.2)] transition hover:bg-[#047857] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Save &amp; Continue <ArrowRight />
+                      {saving ? "Saving…" : businessId ? "Save Changes" : "Save & Continue"}{" "}
+                      <ArrowRight />
                     </button>
                   </div>
                 </form>
@@ -599,8 +780,8 @@ export default function BusinessProfileSetup() {
               </p>
             </div>
             <p className="max-w-[530px] rounded-xl bg-white/[.04] px-4 py-3 text-[10px] leading-5 text-[#92A9BA]">
-              Business profile information entered here remains in this frontend demonstration and
-              is not submitted to a review team or stored on a server.
+              Business profile information is saved to FundTogether's database for review. All
+              funding activity on FundTogether is simulated.
             </p>
           </div>
           <div className="flex flex-col items-center justify-between gap-4 py-6 text-xs sm:flex-row">

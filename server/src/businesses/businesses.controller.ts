@@ -1,15 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 
+// Controller: maps HTTP requests to BusinessesService. Validation happens in
+// the DTOs (global ValidationPipe); business rules live in the service.
 @Controller('businesses')
 export class BusinessesController {
   constructor(private readonly businessesService: BusinessesService) {}
 
   @Post()
-  create(@Body() createBusinessDto: CreateBusinessDto) {
-    return this.businessesService.create(createBusinessDto);
+  create(@Body() dto: CreateBusinessDto) {
+    return this.businessesService.create(dto);
   }
 
   @Get()
@@ -18,17 +22,18 @@ export class BusinessesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.businessesService.findOne(+id);
+  findOne(@Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
+    return this.businessesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBusinessDto: UpdateBusinessDto) {
-    return this.businessesService.update(+id, updateBusinessDto);
+  update(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @Body() dto: UpdateBusinessDto) {
+    return this.businessesService.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.businessesService.remove(+id);
+  @HttpCode(204)
+  remove(@Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
+    return this.businessesService.remove(id);
   }
 }
