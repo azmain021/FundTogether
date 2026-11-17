@@ -1,0 +1,11 @@
+{
+  "name": "fundtogether",
+  "private": true,
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter client --filter server run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm --filter server test"
+  }
+}
