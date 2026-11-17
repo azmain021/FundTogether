@@ -30,19 +30,31 @@ pnpm lint
 pnpm test
 ```
 
-## Architecture
+## Architecture (MVC)
 
-- **React views:** pages and browser interactions in `client/src/`.
-- **NestJS controllers:** HTTP endpoints in each backend feature module.
-- **Services:** application logic and database operations behind controllers.
-- **Mongoose models:** the persistence layer for MongoDB; define schemas within
-  their feature modules as database-backed features are implemented.
+The application is a separate React frontend and NestJS REST backend, organized
+around MVC principles (not server-rendered templates). Each backend feature
+module in `server/src/<feature>/` follows the same layout:
 
-The application uses a separate React frontend and NestJS REST backend, organized
-around MVC principles. It does not use server-rendered Handlebars templates.
-Business CRUD currently returns scaffold responses; persistent schemas, campaign
-CRUD, authentication, uploads and approvals remain pending. The React prototype
-currently uses local/illustrative data and is not connected to the API.
+| Layer | Location | Role |
+|---|---|---|
+| **Model** | `schemas/<name>.schema.ts` | Mongoose schema: fields, types, defaults, indexes |
+| **Controller** | `<feature>.controller.ts` | HTTP routes under `/api`; delegates to the service |
+| Service | `<feature>.service.ts` | Business rules and database reads/writes |
+| DTO | `dto/*.dto.ts` | Request validation (`class-validator`); unknown fields are rejected |
+| **View** | `client/src/*.tsx` | React pages; call the API through `client/src/api/` |
+
+Shared enums live in `server/src/common/enums.ts` and are mirrored for the client
+in `client/src/api/types.ts`. In development, Vite proxies `/api` to the NestJS
+server, so the client needs no extra configuration.
+
+**Implemented so far:** Business profile CRUD (`/api/businesses`) and campaign
+draft CRUD (`/api/campaigns`) persist to MongoDB, and the business profile page
+saves to and reloads from the API. A campaign can only be created for a business
+whose `verificationStatus` is `approved`; until the admin review flow exists, set
+that field manually in Atlas for testing. **Pending:** authentication (so
+`ownerId` and ownership checks are not enforced yet), document uploads, reviews
+and approvals, and connecting the remaining prototype pages.
 
 ## MongoDB Atlas
 
