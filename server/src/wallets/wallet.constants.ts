@@ -1,0 +1,2 @@
+export const STARTER_WALLET_BALANCE = 100_000;
+export const WALLET_LEDGER_PAGE_SIZE = 20;

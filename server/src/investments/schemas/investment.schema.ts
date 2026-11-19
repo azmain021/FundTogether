@@ -4,6 +4,22 @@ import { Campaign } from '../../campaigns/schemas/campaign.schema';
 import { InvestmentStatus } from '../../common/enums';
 import { User } from '../../users/schemas/user.schema';
 
+export const INVESTMENT_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+@Schema({ _id: false })
+class PendingInvestmentNotifications {
+  @Prop({ type: Types.ObjectId, required: true })
+  ownerId: Types.ObjectId;
+
+  @Prop({ required: true })
+  campaignTitle: string;
+
+  @Prop({ type: Types.ObjectId, required: true })
+  ownerNotificationId: Types.ObjectId;
+}
+const PendingInvestmentNotificationsSchema = SchemaFactory.createForClass(PendingInvestmentNotifications);
+
+
 @Schema({ collection: 'investments', timestamps: true, versionKey: false })
 export class Investment {
   @Prop({ type: Types.ObjectId, ref: User.name, required: true })
@@ -33,12 +49,20 @@ export class Investment {
   @Prop({
     required: true,
     lowercase: true,
-    match: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    match: INVESTMENT_KEY_PATTERN,
   })
   idempotencyKey: string;
 
   @Prop({ type: String, enum: Object.values(InvestmentStatus), default: InvestmentStatus.Confirmed })
   status: InvestmentStatus;
+
+  @Prop({ min: 0, validate: Number.isSafeInteger })
+  campaignRemainingUnitsAfter?: number;
+
+  @Prop({ type: PendingInvestmentNotificationsSchema })
+  pendingNotifications?: PendingInvestmentNotifications;
+
+  createdAt: Date;
 }
 
 export const InvestmentSchema = SchemaFactory.createForClass(Investment);

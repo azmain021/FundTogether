@@ -76,6 +76,21 @@ export class CampaignsService {
     ).sort({ startsAt: -1, _id: -1 }).lean().exec();
   }
 
+  async findPublished(id: Types.ObjectId) {
+    const campaign = await this.campaignModel.findOne({
+      _id: id, status: { $in: [CampaignStatus.Active, CampaignStatus.Funded] }, deletedAt: null,
+    }).select(
+      'title description purpose useOfFunds fundingTarget unitPrice totalUnits remainingUnits status startsAt endsAt ' +
+      'businessSnapshot.name businessSnapshot.sector businessSnapshot.division businessSnapshot.district',
+    ).lean().exec();
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    return {
+      ...campaign,
+      acceptingInvestments: campaign.status === CampaignStatus.Active && campaign.remainingUnits > 0 &&
+        !!campaign.endsAt && campaign.endsAt > new Date(),
+    };
+  }
+
   async findForUser(id: Types.ObjectId, user: CurrentAccount, session?: ClientSession): Promise<CampaignDocument> {
     const query = this.campaignModel.findOne({ _id: id, deletedAt: null });
     if (session) query.session(session);

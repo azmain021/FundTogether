@@ -103,3 +103,5 @@ export type PublishedCampaign = Pick<Campaign, '_id' | 'title' | 'fundingTarget'
   status: 'active' | 'funded';
   businessSnapshot?: { name: string; sector: BusinessSector; division: string; district: string };
 };
+
+export type PublishedCampaignDetail = PublishedCampaign & Pick<Campaign, 'description' | 'purpose' | 'useOfFunds'> & { acceptingInvestments: boolean };

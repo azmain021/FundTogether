@@ -25,7 +25,9 @@ export default function Login({ next = '' }: { next?: string }) {
         /^\/business\/campaigns\/(new|[a-f0-9]{24})$/i.test(nextPath)
       );
       const reviewPath = user.role === 'admin' && /^\/admin\/campaigns(?:\/[a-f0-9]{24})?$/i.test(nextPath);
-      const destination = allowed.includes(nextPath) || campaignPath || reviewPath ? next : accountHome[user.role];
+      const walletPath = user.role === 'investor' && nextPath === '/investor/wallet';
+      const publishedCampaignPath = /^\/campaigns\/[a-f0-9]{24}$/i.test(nextPath);
+      const destination = allowed.includes(nextPath) || campaignPath || reviewPath || walletPath || publishedCampaignPath ? next : accountHome[user.role];
       window.location.assign(destination);
     } catch (cause: unknown) {
       setError(cause instanceof ApiError && cause.details.length ? cause.details.join(' ') : cause instanceof Error ? cause.message : 'Could not log in. Please try again.');
