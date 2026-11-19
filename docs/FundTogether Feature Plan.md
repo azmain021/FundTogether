@@ -293,12 +293,13 @@ Owners of approved businesses create, view, edit and delete campaign drafts. The
   | `GET /campaigns/mine` | business_owner | List own campaigns, filterable by status |
   | `GET /campaigns/:id` | owner / admin | Full detail |
   | `PATCH /campaigns/:id` | owner | Edit; only `draft` or `rejected` |
-  | `DELETE /campaigns/:id` | owner | Only `draft` with no review history; otherwise archive |
+  | `DELETE /campaigns/:id` | owner | Soft-archive a `draft` or `rejected` campaign, preserving review history |
 - **Backend logic:**
   - Check that the business is owned by the caller and is `approved`.
   - Validate (D-05): `fundingTarget` and `unitPrice` are positive integers, `fundingTarget % unitPrice === 0`, `durationDays` is between **7 and 90**, `totalUnits` is between 1 and 100,000, and text fields have length limits.
   - **The server computes** `totalUnits = fundingTarget / unitPrice` and `remainingUnits = totalUnits`. Values sent by the client are ignored.
   - `status`, `version` and the unit fields cannot be changed through PATCH.
+  - Editing a rejected campaign returns it to draft. Archiving hides it from My Campaigns and preserves the campaign and review records. Campaigns under review or already published cannot be archived from this workspace.
 - **Frontend:** "My campaigns" list and a create/edit form with a live unit-calculation preview that mirrors the server formula. Status badges.
 - **Done when:**
   - A ৳5,000,000 target at ৳500 per unit stores `totalUnits = 10000`.

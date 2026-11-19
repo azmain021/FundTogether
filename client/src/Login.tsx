@@ -19,7 +19,12 @@ export default function Login({ next = '' }: { next?: string }) {
       const user = await login({ email, password });
       // Only known application paths are accepted as return destinations.
       const allowed = ['/marketplace', '/campaigns/shobuj-bazar', '/business/profile', '/business/documents', '/business/review-status', '/investor', '/admin', '/account/security'];
-      const destination = allowed.includes(next) ? next : accountHome[user.role];
+      const nextPath = next.split('?')[0];
+      const campaignPath = user.role === 'business_owner' && (
+        nextPath === '/business/campaigns' ||
+        /^\/business\/campaigns\/(new|[a-f0-9]{24})$/i.test(nextPath)
+      );
+      const destination = allowed.includes(nextPath) || campaignPath ? next : accountHome[user.role];
       window.location.assign(destination);
     } catch (cause: unknown) {
       setError(cause instanceof ApiError && cause.details.length ? cause.details.join(' ') : cause instanceof Error ? cause.message : 'Could not log in. Please try again.');

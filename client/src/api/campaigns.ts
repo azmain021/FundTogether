@@ -1,14 +1,11 @@
 import { apiRequest } from "./client";
-import type { Campaign, CampaignInput } from "./types";
+import type { Campaign, CampaignInput, CampaignStatus } from "./types";
 
 export const createCampaign = (input: CampaignInput) =>
   apiRequest<Campaign>("/campaigns", { method: "POST", body: input });
 
-export const listCampaigns = (businessId?: string, signal?: AbortSignal) =>
-  apiRequest<Campaign[]>(
-    businessId ? `/campaigns?businessId=${encodeURIComponent(businessId)}` : "/campaigns",
-    { signal },
-  );
+export const listMyCampaigns = (status?: CampaignStatus, signal?: AbortSignal) =>
+  apiRequest<Campaign[]>(status ? `/campaigns/mine?status=${encodeURIComponent(status)}` : "/campaigns/mine", { signal });
 
 export const getCampaign = (id: string, signal?: AbortSignal) =>
   apiRequest<Campaign>(`/campaigns/${encodeURIComponent(id)}`, { signal });

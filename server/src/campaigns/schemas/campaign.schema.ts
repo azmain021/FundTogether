@@ -86,10 +86,13 @@ export class Campaign {
 
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
+
+  updatedAt?: Date;
 }
 
 export type CampaignDocument = HydratedDocument<Campaign>;
 export const CampaignSchema = SchemaFactory.createForClass(Campaign);
 CampaignSchema.index({ status: 1, createdAt: -1 });
+CampaignSchema.index({ ownerId: 1, status: 1, createdAt: -1 });
 CampaignSchema.index({ status: 1, endsAt: 1 });
 CampaignSchema.index({ title: 'text', description: 'text', 'businessSnapshot.name': 'text' });

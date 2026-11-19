@@ -14,11 +14,13 @@ const BusinessRegistration = React.lazy(() => import("./BusinessRegistration"));
 const BusinessProfileSetup = React.lazy(() => import("./BusinessProfileSetup"));
 const BusinessDocumentSubmission = React.lazy(() => import("./BusinessDocumentSubmission"));
 const DocumentReviewStatus = React.lazy(() => import("./DocumentReviewStatus"));
+const CampaignList = React.lazy(() => import("./campaigns/CampaignList"));
+const CampaignDraftPage = React.lazy(() => import("./campaigns/CampaignDraftPage"));
 
 const appPaths = new Set([
   "/", "/marketplace", "/login", "/register", "/forgot-password", "/reset-password",
   "/campaigns/shobuj-bazar", "/business/register", "/investor/register",
-  "/business/profile", "/business/documents", "/business/review-status", "/investor", "/admin", "/account/security",
+  "/business/profile", "/business/documents", "/business/review-status", "/business/campaigns", "/investor", "/admin", "/account/security",
 ]);
 
 export default function AppRouter() {
@@ -73,6 +75,9 @@ export default function AppRouter() {
       <Route path="/business/profile" element={<SessionGate roles={["business_owner"]}><BusinessProfileSetup /></SessionGate>} />
       <Route path="/business/documents" element={<SessionGate roles={["business_owner"]}><BusinessDocumentSubmission /></SessionGate>} />
       <Route path="/business/review-status" element={<SessionGate roles={["business_owner"]}><DocumentReviewStatus /></SessionGate>} />
+      <Route path="/business/campaigns" element={<SessionGate roles={["business_owner"]}><CampaignList /></SessionGate>} />
+      <Route path="/business/campaigns/new" element={<SessionGate roles={["business_owner"]}><CampaignDraftPage /></SessionGate>} />
+      <Route path="/business/campaigns/:id" element={<SessionGate roles={["business_owner"]}><CampaignDraftPage /></SessionGate>} />
       <Route path="/investor" element={<SessionGate roles={["investor"]}><AccountHome role="investor" /></SessionGate>} />
       <Route path="/admin" element={<SessionGate roles={["admin"]}><AccountHome role="admin" /></SessionGate>} />
       <Route path="*" element={<App />} />

@@ -25,6 +25,7 @@ export default function AccountLinks({ mobile = false }: { mobile?: boolean }) {
     <div className={`flex gap-4 ${mobile ? 'flex-col items-start px-3 py-3' : 'items-center'}`}>
       {user ? <>
         <a href={accountHome[user.role]} className="text-sm font-semibold text-[#047857]">{user.role === 'business_owner' ? 'Business Profile' : user.displayName}</a>
+        {user.role === 'business_owner' && <a href="/business/campaigns" className="text-sm font-semibold text-[#334E68]">My Campaigns</a>}
         <a href="/account/security" className="text-sm font-semibold text-[#334E68]">Security</a>
         <button onClick={signOut} disabled={leaving} className="text-sm font-semibold text-[#334E68] disabled:opacity-60">{leaving ? 'Logging out…' : 'Log out'}</button>
         {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
