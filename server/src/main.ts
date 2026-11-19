@@ -1,11 +1,13 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ApiExceptionFilter } from './common/api-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
+  app.useGlobalFilters(new ApiExceptionFilter());
   app.enableCors({
     origin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173',
     credentials: true,

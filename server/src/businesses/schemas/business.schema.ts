@@ -31,13 +31,13 @@ export class Business {
   @Prop({ type: String, required: true, enum: Object.values(BusinessSize) })
   size: BusinessSize;
 
-  @Prop({ required: true, min: 1900 })
+  @Prop({ required: true, min: 1900, validate: Number.isSafeInteger })
   establishedYear: number;
 
   @Prop({ trim: true, maxlength: 1000 })
   operatingHistory?: string;
 
-  @Prop({ required: true, min: 0 })
+  @Prop({ required: true, min: 0, validate: Number.isSafeInteger })
   employeeCount: number;
 
   @Prop({ required: true, trim: true, maxlength: 50 })

@@ -1,6 +1,7 @@
 import { ConflictException, INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
+import { ThrottlerModule } from '@nestjs/throttler';
 import request from 'supertest';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -9,6 +10,7 @@ import { SESSION_COOKIE, SessionsService } from './sessions.service';
 describe('Business owner registration API', () => {
   let app: INestApplication;
   const registerBusinessOwner = jest.fn();
+  const registerInvestor = jest.fn();
   const login = jest.fn();
   const sessions = { create: jest.fn(), revoke: jest.fn(), currentUser: jest.fn() };
   const account = { id: 'test-user-id', email: 'owner@example.com', role: 'business_owner' };
@@ -22,9 +24,10 @@ describe('Business owner registration API', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ limit: 100, ttl: 60_000 }])],
       controllers: [AuthController],
       providers: [
-        { provide: AuthService, useValue: { registerBusinessOwner, login } },
+        { provide: AuthService, useValue: { registerBusinessOwner, registerInvestor, login } },
         { provide: SessionsService, useValue: sessions },
         { provide: ConfigService, useValue: { get: () => undefined } },
       ],
@@ -41,6 +44,7 @@ describe('Business owner registration API', () => {
 
   beforeEach(() => {
     registerBusinessOwner.mockReset();
+    registerInvestor.mockReset();
     login.mockReset();
     Object.values(sessions).forEach(mock => mock.mockReset());
   });
@@ -82,8 +86,18 @@ describe('Business owner registration API', () => {
       .expect(409);
   });
 
+  it('registers an investor and rejects a client-supplied role', async () => {
+    const investor = { ...account, role: 'investor' };
+    registerInvestor.mockResolvedValueOnce(investor);
+    await request(app.getHttpServer()).post('/api/auth/register/investor')
+      .send(payload).expect(201).expect(investor);
+    await request(app.getHttpServer()).post('/api/auth/register/investor')
+      .send({ ...payload, role: 'admin' }).expect(400);
+    expect(registerInvestor).toHaveBeenCalledTimes(1);
+  });
+
   it('logs in and sets a session cookie without exposing the token in the body', async () => {
-    login.mockResolvedValueOnce(account);
+    login.mockResolvedValueOnce({ user: account, credentialVersion: 2 });
     sessions.create.mockResolvedValueOnce('a'.repeat(64));
     const response = await request(app.getHttpServer())
       .post('/api/auth/login')
@@ -91,6 +105,7 @@ describe('Business owner registration API', () => {
       .send({ email: payload.email, password: payload.password })
       .expect(200);
     expect(response.body).toEqual(account);
+    expect(sessions.create).toHaveBeenCalledWith(account.id, 2);
     expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
     expect(response.headers['set-cookie'][0]).toContain('SameSite=Lax');
     expect(response.headers['set-cookie'][0]).toContain('Path=/api');

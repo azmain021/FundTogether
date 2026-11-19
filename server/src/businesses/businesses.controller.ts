@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { SessionGuard } from '../auth/session.guard';
-import type { AuthenticatedRequest } from '../auth/session.guard';
-import { BusinessOwnerGuard } from '../auth/business-owner.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { CurrentAccount } from '../auth/current-user.decorator';
+import { Roles } from '../auth/roles.guard';
+import { UserRole } from '../common/enums';
 import { SessionOriginGuard } from '../auth/session-origin.guard';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
@@ -17,37 +19,40 @@ export class BusinessesController {
   constructor(private readonly businessesService: BusinessesService) {}
 
   @Post()
-  @UseGuards(BusinessOwnerGuard, SessionOriginGuard)
-  create(@Body() dto: CreateBusinessDto, @Req() request: AuthenticatedRequest) {
-    return this.businessesService.create(dto, request.user.id);
+  @Roles(UserRole.BusinessOwner)
+  @UseGuards(SessionOriginGuard)
+  create(@Body() dto: CreateBusinessDto, @CurrentUser() user: CurrentAccount) {
+    return this.businessesService.create(dto, user.id);
   }
 
   @Get()
-  findAll(@Req() request: AuthenticatedRequest) {
-    return this.businessesService.findAll(request.user);
+  findAll(@CurrentUser() user: CurrentAccount) {
+    return this.businessesService.findAll(user);
   }
 
   @Get('me')
-  @UseGuards(BusinessOwnerGuard)
-  me(@Req() request: AuthenticatedRequest) {
-    return this.businessesService.findMine(request.user.id);
+  @Roles(UserRole.BusinessOwner)
+  me(@CurrentUser() user: CurrentAccount) {
+    return this.businessesService.findMine(user.id);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @Req() request: AuthenticatedRequest) {
-    return this.businessesService.findForUser(id, request.user);
+  findOne(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @CurrentUser() user: CurrentAccount) {
+    return this.businessesService.findForUser(id, user);
   }
 
   @Patch(':id')
-  @UseGuards(BusinessOwnerGuard, SessionOriginGuard)
-  update(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @Body() dto: UpdateBusinessDto, @Req() request: AuthenticatedRequest) {
-    return this.businessesService.update(id, dto, request.user);
+  @Roles(UserRole.BusinessOwner)
+  @UseGuards(SessionOriginGuard)
+  update(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @Body() dto: UpdateBusinessDto, @CurrentUser() user: CurrentAccount) {
+    return this.businessesService.update(id, dto, user);
   }
 
   @Delete(':id')
-  @UseGuards(BusinessOwnerGuard, SessionOriginGuard)
+  @Roles(UserRole.BusinessOwner)
+  @UseGuards(SessionOriginGuard)
   @HttpCode(204)
-  remove(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @Req() request: AuthenticatedRequest) {
-    return this.businessesService.remove(id, request.user);
+  remove(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @CurrentUser() user: CurrentAccount) {
+    return this.businessesService.remove(id, user);
   }
 }

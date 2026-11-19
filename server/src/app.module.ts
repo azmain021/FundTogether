@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { FeatureModelsModule } from './database/feature-models.module';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
         if (!uri) {
           throw new Error('Set MONGODB_URI in server/.env before starting the API.');
         }
-        return { uri, dbName: 'fundtogether' };
+        return { uri, dbName: config.get<string>('MONGODB_DATABASE')?.trim() || 'fundtogether' };
       },
     }),
     BusinessesModule,
@@ -28,6 +29,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     UsersModule,
     CampaignsModule,
     OnboardingModule,
+    FeatureModelsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

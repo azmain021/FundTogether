@@ -3,11 +3,18 @@
 The current implementation uses email and password authentication. This replaces
 the Google sign-in flow described in the original planning documents.
 
-- `/register` offers Investor and Business Owner account types. Investor
-  registration is not implemented yet and is marked as coming soon.
+- `/register` offers Investor and Business Owner account types.
+- `/investor/register` creates an investor account, then links to `/login`.
 - `/business/register` creates a business owner account, then links to `/login`.
 - `/login` validates credentials and sets an eight-hour HttpOnly session cookie.
 - Business owners can then open `/business/profile` to set up their business.
+- Investors and seeded administrators land on their protected account pages at
+  `/investor` and `/admin`. Admin accounts are provisioned by the seed command.
+- `/forgot-password` resets a password in one form using the account email,
+  a saved recovery code, and a new password. No email is sent.
+- New users see a recovery code after sign-up. Existing users and seeded
+  admins can sign in and generate a code under **Security**. Sign-up does not
+  require email verification.
 - `/marketplace` remains available to visitors and currently uses demo content.
 - `/campaigns/shobuj-bazar` requires login, including when opened directly.
   Other sample campaigns do not have detail pages yet.
@@ -16,10 +23,13 @@ the Google sign-in flow described in the original planning documents.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/auth/register/business-owner` | Create an owner account |
+| POST | `/api/auth/register/business-owner` | Create an owner account and return its recovery code once |
+| POST | `/api/auth/register/investor` | Create an investor account and return its recovery code once |
 | POST | `/api/auth/login` | Check credentials and create a session |
 | GET | `/api/auth/me` | Return the current account; 401 without a valid session |
 | POST | `/api/auth/logout` | Delete the session and clear its cookie |
+| POST | `/api/auth/recovery-code` | Generate or replace the code using a valid session and current password |
+| POST | `/api/auth/reset-password` | Match the email and recovery code, change the password, and revoke existing sessions |
 
 Passwords are hashed with Argon2id. Session tokens are random and only their
 SHA-256 hashes are stored in the `sessions` collection. Sessions expire after
@@ -29,14 +39,23 @@ The session cookie uses `SameSite=Lax`, path `/api`, and `Secure` in production.
 Browser authentication writes must come from `FRONTEND_ORIGIN`. During local
 development, `http://localhost:5173` and `http://127.0.0.1:5173` are also accepted.
 
+Only the recovery code hash is stored in MongoDB. A code works until it is
+used or replaced. Password change, code consumption, and session revocation
+run in one transaction. An older session created by a concurrent login is
+also rejected. Auth write routes are rate-limited. After a reset, sign in
+with the new password and generate a new code in Security.
+
+Existing accounts need to generate a code before they can use password recovery.
+Previously issued email links have been retired.
+
 Campaign API routes require a valid session. Campaign-specific owner/role
 authorization remains work for the campaign module. Business profiles and
 documents now enforce owner authorization on the server. Profile setup loads
 `GET /api/businesses/me`; it no longer uses a browser-stored business ID.
 
 Registration does not automatically log in or create a business profile. Users
-are stored in `fundtogether.users`, profiles in `fundtogether.businesses`, and
-sessions in `fundtogether.sessions` in the MongoDB database configured by the API.
+are stored in `users`, profiles in `businesses`, and sessions in `sessions`
+in the MongoDB database configured by the API.
 
 ## Business registration and verification documents
 
@@ -92,11 +111,10 @@ An existing database from the Google-only prototype may still have a unique
 `googleSub_1` index and a non-unique `email_1` index. Removing a field from a
 Mongoose schema does not migrate these existing database indexes.
 
-The read-only diagnostic is `node test/inspect-registration-indexes.cjs` from
-`server/`. The reviewed migration is `node test/migrate-registration-indexes.cjs`.
-It checks for invalid/duplicate email groups, creates `unique_account_email`,
-then removes only the obsolete `googleSub_1` index. It never changes account
-records. Run the migration with the database owner's authorization.
+Use `pnpm --filter server db:migrate` with the explicit database target.
+It checks for invalid or duplicate normalized emails, normalizes eligible
+addresses and creates `unique_account_email` before removing `googleSub_1`.
+See the [database setup guide](../README.md#database-migration-demo-seed-and-verification).
 
 The opt-in live test, `node test/onboarding.live-smoke.cjs`, creates labelled
 synthetic records in the configured database and private file storage. It tests

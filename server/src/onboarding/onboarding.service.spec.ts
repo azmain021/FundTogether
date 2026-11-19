@@ -1,5 +1,7 @@
 import { ConflictException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { ClientSession, Connection, Model, Types } from 'mongoose';
+import { Readable } from 'node:stream';
+import { buffer } from 'node:stream/consumers';
 import { BusinessesService } from '../businesses/businesses.service';
 import { Business } from '../businesses/schemas/business.schema';
 import { BusinessSector, BusinessSize, BusinessType, UserRole, VerificationStatus } from '../common/enums';
@@ -21,6 +23,7 @@ function setup() {
     establishedYear: 2020, employeeCount: 0, division: 'Dhaka', district: 'Dhaka', address: 'Synthetic test address',
     description: 'A synthetic profile used for automated registration tests.', businessEmail: actor.email,
     contactPhone: actor.phone, verificationStatus: VerificationStatus.Draft,
+    onboardingVersion: 0,
     save: jest.fn().mockImplementation(async () => business),
     toObject: () => ({ officialName: 'Synthetic Test Business', verificationStatus: business.verificationStatus }),
   };
@@ -76,7 +79,7 @@ function setup() {
       bytes.set(storageKey, file.buffer);
       return { storageKey, mimeType: 'application/pdf' };
     }),
-    read: jest.fn().mockImplementation(async (key: string) => bytes.get(key)),
+    stream: jest.fn().mockImplementation(async (key: string) => Readable.from(bytes.get(key) ?? [])),
     remove: jest.fn().mockImplementation(async (key: string) => { bytes.delete(key); }),
   };
   const service = new OnboardingService(connection as unknown as Connection, businesses as unknown as Model<Business>, documents as unknown as Model<VerificationDocument>, applications as unknown as Model<BusinessApplication>, businessService as unknown as BusinessesService, storage as unknown as StorageService);
@@ -92,7 +95,7 @@ describe('Business onboarding workflow', () => {
     expect(reloaded[0]._id).toBe(uploaded._id);
     expect(reloaded[0]).not.toHaveProperty('storageKey');
     const download = await service.download(new Types.ObjectId(uploaded._id), actor);
-    expect(download.bytes).toEqual(fixture.buffer);
+    expect(await buffer(download.stream)).toEqual(fixture.buffer);
   });
 
   it('keeps replaced versions and exposes only the replacement as current', async () => {

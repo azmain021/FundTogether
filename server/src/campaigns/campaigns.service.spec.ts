@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -28,12 +27,12 @@ const validDto = (overrides: Partial<CreateCampaignDto> = {}): CreateCampaignDto
 
 describe('CampaignsService', () => {
   let service: CampaignsService;
-  let assertApproved: jest.Mock<(id: Types.ObjectId) => Promise<unknown>>;
+  let assertApproved: jest.Mock<Promise<unknown>, [Types.ObjectId]>;
   let stored: Record<string, unknown> | null;
 
   beforeEach(async () => {
     stored = null;
-    assertApproved = jest.fn(async () => business);
+    assertApproved = jest.fn(async (_id: Types.ObjectId) => business);
     const modelMock = {
       create: jest.fn(async (data: unknown) => data),
       findOne: jest.fn(() => ({ exec: async () => stored })),

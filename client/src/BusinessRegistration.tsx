@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { registerBusinessOwner } from "./api/auth";
+import { registerBusinessOwner, registerInvestor } from "./api/auth";
+import RecoveryCodeNotice from "./auth/RecoveryCodeNotice";
 import { ApiError } from "./api/client";
 
 type IconProps = { className?: string };
@@ -215,7 +216,8 @@ function PasswordField({
   );
 }
 
-export default function BusinessRegistration() {
+export default function BusinessRegistration({ investor = false }: { investor?: boolean }) {
+  const accountType = investor ? "Investor" : "Business Owner";
   const [mobileOpen, setMobileOpen] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -228,7 +230,8 @@ export default function BusinessRegistration() {
   const [message, setMessage] = useState("");
   const [hasError, setHasError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [registered, setRegistered] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const registered = recoveryCode !== "";
 
   const updateField = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -253,16 +256,17 @@ export default function BusinessRegistration() {
     setMessage("");
     setSaving(true);
     try {
-      const account = await registerBusinessOwner({
+      const register = investor ? registerInvestor : registerBusinessOwner;
+      const account = await register({
         fullName: form.fullName,
         email: form.email,
         phone: form.phone,
         password: form.password,
         acceptedTerms,
       });
-      setRegistered(true);
+      setRecoveryCode(account.recoveryCode);
       setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
-      setMessage(`Your business owner account for ${account.email} has been created. Log in to set up your business profile.`);
+      setMessage(`Your ${accountType.toLowerCase()} account for ${account.email} has been created.`);
     } catch (error: unknown) {
       setHasError(true);
       setMessage(
@@ -347,24 +351,25 @@ export default function BusinessRegistration() {
         <section className="border-b border-[#E3EAF0] bg-white">
           <div className="page-container py-10 text-center sm:py-12">
             <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#059669]">
-              Business owner onboarding
+              {accountType} registration
             </p>
             <h1 className="mt-3 text-[36px] font-bold leading-tight tracking-[-0.045em] text-[#102A43] sm:text-[44px]">
-              Create Your Business Owner Account
+              Create Your {accountType} Account
             </h1>
             <p className="mx-auto mt-4 max-w-[650px] text-[15px] leading-7 text-[#526B82]">
-              Create a business owner profile and learn how eligible businesses can apply to build
-              simulated funding campaigns on FundTogether.
+              {investor
+                ? "Explore simulated funding campaigns with an investor account."
+                : "Create your account to set up your business and apply to run a simulated funding campaign."}
             </p>
-            <p className="mx-auto mt-2 max-w-[600px] text-[11px] leading-5 text-[#829AB1]">
+            {!investor && <p className="mx-auto mt-2 max-w-[600px] text-[11px] leading-5 text-[#829AB1]">
               Create your account first. You will add your business details in the next step.
-            </p>
+            </p>}
           </div>
         </section>
 
         <section className="py-10 sm:py-14">
           <div className="page-container">
-            <div className="mb-8 grid grid-cols-4 overflow-hidden rounded-2xl border border-[#DCE5EB] bg-white shadow-[0_6px_22px_rgba(16,42,67,.05)] lg:hidden">
+            {!investor && <div className="mb-8 grid grid-cols-4 overflow-hidden rounded-2xl border border-[#DCE5EB] bg-white shadow-[0_6px_22px_rgba(16,42,67,.05)] lg:hidden">
               {steps.map((step, index) => (
                 <div
                   key={step.number}
@@ -382,10 +387,10 @@ export default function BusinessRegistration() {
                   </p>
                 </div>
               ))}
-            </div>
+            </div>}
 
-            <div className="grid overflow-hidden rounded-[24px] border border-[#DCE5EB] bg-white shadow-[0_18px_50px_rgba(16,42,67,.09)] lg:grid-cols-[360px_1fr]">
-              <aside className="relative hidden overflow-hidden bg-[#102A43] p-10 text-white lg:block">
+            <div className={`grid overflow-hidden rounded-[24px] border border-[#DCE5EB] bg-white shadow-[0_18px_50px_rgba(16,42,67,.09)] ${investor ? "mx-auto max-w-3xl" : "lg:grid-cols-[360px_1fr]"}`}>
+              {!investor && <aside className="relative hidden overflow-hidden bg-[#102A43] p-10 text-white lg:block">
                 <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full border-[44px] border-white/[.035]" />
                 <div className="absolute -right-20 top-28 h-48 w-48 rounded-full bg-[#059669]/10 blur-2xl" />
                 <div className="relative">
@@ -424,7 +429,7 @@ export default function BusinessRegistration() {
                     ))}
                   </div>
                 </div>
-              </aside>
+              </aside>}
 
               <div className="p-6 sm:p-9 lg:p-12">
                 <div className="flex flex-col justify-between gap-3 border-b border-[#E3EAF0] pb-6 sm:flex-row sm:items-end">
@@ -526,9 +531,10 @@ export default function BusinessRegistration() {
                   >
                     {saving ? "Creating Account…" : registered ? "Account Created" : "Create Account"} <ArrowRight />
                   </button>
+                  {recoveryCode && <RecoveryCodeNotice code={recoveryCode} />}
                   {registered && (
                     <a
-                      href="/login?registered=1&next=%2Fbusiness%2Fprofile"
+                      href={investor ? "/login?registered=1" : "/login?registered=1&next=%2Fbusiness%2Fprofile"}
                       className="mt-4 flex items-center gap-2 text-sm font-bold text-[#059669]"
                     >
                       Log in to Continue <ArrowRight />
@@ -566,8 +572,7 @@ export default function BusinessRegistration() {
             <div className="max-w-[560px] rounded-xl bg-white/[.04] px-4 py-3">
               <p className="text-[10px] leading-5 text-[#92A9BA]">
                 <strong className="font-semibold text-[#C8D6E0]">Registration notice:</strong> This
-                form creates a business owner account. Your password is stored as a hash. Business
-                verification is a separate step, and all funding activity is simulated.
+                form creates an account for simulated funding activity. {investor ? "" : "Business verification is a separate step."}
               </p>
             </div>
           </div>

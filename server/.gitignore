@@ -2,6 +2,8 @@
 /dist
 /node_modules
 /build
+/.local-mail/
+/storage/
 
 # TypeScript build cache
 *.tsbuildinfo

@@ -30,6 +30,6 @@ describe('Document file validation', () => {
 
   it('does not read arbitrary filesystem paths', async () => {
     const storage = new StorageService({ get: () => undefined } as unknown as ConfigService);
-    await expect(storage.read('../../.env')).rejects.toThrow(BadRequestException);
+    await expect(storage.stream('../../.env')).rejects.toThrow(BadRequestException);
   });
 });
