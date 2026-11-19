@@ -100,8 +100,8 @@ export class BusinessesService {
   }
 
   /** Campaign gate (BR-03): used by CampaignsService before creating or editing campaigns. */
-  async assertApproved(id: Types.ObjectId): Promise<BusinessDocument> {
-    const business = await this.findOne(id);
+  async assertApproved(id: Types.ObjectId, user?: AuthenticatedRequest['user']): Promise<BusinessDocument> {
+    const business = user ? await this.findForUser(id, user) : await this.findOne(id);
     if (business.verificationStatus !== VerificationStatus.Approved) {
       throw new ForbiddenException('Business verification must be approved before campaign creation');
     }

@@ -34,10 +34,12 @@ export class CreateCampaignDto {
   // Whole virtual taka (D-07).
   @IsInt()
   @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
   fundingTarget: number;
 
   @IsInt()
   @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
   unitPrice: number;
 
   // D-05: campaigns last 7–90 days.

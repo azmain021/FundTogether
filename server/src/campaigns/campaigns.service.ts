@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import type { CurrentAccount } from '../auth/current-user.decorator';
 import { BusinessesService } from '../businesses/businesses.service';
-import { CampaignStatus } from '../common/enums';
+import { CampaignStatus, UserRole } from '../common/enums';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
+import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { Campaign, CampaignDocument } from './schemas/campaign.schema';
 
@@ -29,9 +31,9 @@ export class CampaignsService {
     return totalUnits;
   }
 
-  // TODO(auth): check that the business belongs to the current user.
-  async create(dto: CreateCampaignDto): Promise<CampaignDocument> {
-    const business = await this.businessesService.assertApproved(new Types.ObjectId(dto.businessId));
+  async create(dto: CreateCampaignDto, user: CurrentAccount): Promise<CampaignDocument> {
+    this.assertBusinessOwner(user);
+    const business = await this.businessesService.assertApproved(new Types.ObjectId(dto.businessId), user);
     const totalUnits = CampaignsService.calculateTotalUnits(dto.fundingTarget, dto.unitPrice);
 
     return this.campaignModel.create({
@@ -50,47 +52,108 @@ export class CampaignsService {
     });
   }
 
-  // TODO(auth): replace with GET /campaigns/mine for owners and an admin queue.
-  findAll(businessId?: Types.ObjectId): Promise<CampaignDocument[]> {
-    const filter = businessId ? { businessId, deletedAt: null } : { deletedAt: null };
-    return this.campaignModel.find(filter).sort({ createdAt: -1 }).exec();
+  async findMine(ownerId: string, query: ListCampaignsDto): Promise<CampaignDocument[]> {
+    const owner = new Types.ObjectId(ownerId);
+    const business = await this.businessesService.findMine(ownerId);
+    // Older campaigns may lack ownerId. Their active business still identifies the owner.
+    const ownership = business
+      ? { $or: [{ ownerId: owner }, { ownerId: null, businessId: business._id }] }
+      : { ownerId: owner };
+    return this.campaignModel.find({
+      ...ownership,
+      deletedAt: null,
+      ...(query.businessId ? { businessId: new Types.ObjectId(query.businessId) } : {}),
+      ...(query.status ? { status: query.status } : {}),
+    }).sort({ createdAt: -1, _id: -1 }).exec();
   }
 
-  async findOne(id: Types.ObjectId): Promise<CampaignDocument> {
+  async findForUser(id: Types.ObjectId, user: CurrentAccount): Promise<CampaignDocument> {
     const campaign = await this.campaignModel.findOne({ _id: id, deletedAt: null }).exec();
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
+    if (user.role === UserRole.Admin) return campaign;
+    if (user.role !== UserRole.BusinessOwner) throw new ForbiddenException('Your account cannot access this campaign');
+    if (!campaign.ownerId) {
+      await this.businessesService.findForUser(campaign.businessId, user);
+    } else if (campaign.ownerId.toString() !== user.id) {
+      throw new ForbiddenException('You cannot access another owner’s campaign');
+    }
     return campaign;
   }
 
-  async update(id: Types.ObjectId, dto: UpdateCampaignDto): Promise<CampaignDocument> {
-    const campaign = await this.findOne(id);
+  async update(id: Types.ObjectId, dto: UpdateCampaignDto, user: CurrentAccount): Promise<CampaignDocument> {
+    this.assertBusinessOwner(user);
+    const campaign = await this.findForUser(id, user);
     if (!EDITABLE_STATUSES.includes(campaign.status)) {
       throw new ConflictException(`A campaign cannot be edited while it is ${campaign.status}`);
     }
-    await this.businessesService.assertApproved(campaign.businessId);
+    await this.businessesService.assertApproved(campaign.businessId, user);
 
-    campaign.set(dto);
-    if (dto.fundingTarget !== undefined || dto.unitPrice !== undefined) {
-      const totalUnits = CampaignsService.calculateTotalUnits(campaign.fundingTarget, campaign.unitPrice);
-      campaign.totalUnits = totalUnits;
-      campaign.remainingUnits = totalUnits;
+    const fields = {
+      title: dto.title,
+      description: dto.description,
+      purpose: dto.purpose,
+      useOfFunds: dto.useOfFunds,
+      fundingTarget: dto.fundingTarget,
+      unitPrice: dto.unitPrice,
+      durationDays: dto.durationDays,
+    };
+    if (Object.values(fields).every(value => value === undefined)) {
+      throw new BadRequestException('Provide at least one field to update');
     }
-    // Editing a rejected campaign returns it to draft for resubmission (F8).
-    if (campaign.status === CampaignStatus.Rejected) {
-      campaign.status = CampaignStatus.Draft;
-    }
-    return campaign.save();
+    const totalUnits = CampaignsService.calculateTotalUnits(
+      dto.fundingTarget ?? campaign.fundingTarget,
+      dto.unitPrice ?? campaign.unitPrice,
+    );
+    const updated = await this.campaignModel.findOneAndUpdate(
+      {
+        ...this.draftWriteFilter(campaign),
+        fundingTarget: campaign.fundingTarget,
+        unitPrice: campaign.unitPrice,
+      },
+      { $set: {
+        ...fields,
+        ownerId: new Types.ObjectId(user.id),
+        totalUnits,
+        remainingUnits: totalUnits,
+        // A rejected campaign becomes a draft when the owner edits it (F8).
+        status: CampaignStatus.Draft,
+      } },
+      { returnDocument: 'after', runValidators: true },
+    ).exec();
+    if (!updated) throw new ConflictException('The campaign changed. Reload it and try again.');
+    return updated;
   }
 
-  // Soft delete, drafts only.
-  async remove(id: Types.ObjectId): Promise<void> {
-    const campaign = await this.findOne(id);
-    if (campaign.status !== CampaignStatus.Draft) {
-      throw new ConflictException('Only draft campaigns can be deleted');
+  async remove(id: Types.ObjectId, user: CurrentAccount): Promise<void> {
+    this.assertBusinessOwner(user);
+    const campaign = await this.findForUser(id, user);
+    if (!EDITABLE_STATUSES.includes(campaign.status)) {
+      throw new ConflictException('Only draft or rejected campaigns can be archived');
     }
-    campaign.deletedAt = new Date();
-    await campaign.save();
+    // Archive the campaign record and keep any review history linked to it.
+    const result = await this.campaignModel.updateOne(
+      this.draftWriteFilter(campaign),
+      { $set: { deletedAt: new Date() } },
+    ).exec();
+    if (!result.matchedCount) throw new ConflictException('The campaign changed. Reload it and try again.');
+  }
+
+  private draftWriteFilter(campaign: CampaignDocument) {
+    return {
+      _id: campaign._id,
+      ownerId: campaign.ownerId ?? null,
+      businessId: campaign.businessId,
+      deletedAt: null,
+      status: campaign.status,
+      updatedAt: campaign.updatedAt ?? null,
+    };
+  }
+
+  private assertBusinessOwner(user: CurrentAccount) {
+    if (user.role !== UserRole.BusinessOwner) {
+      throw new ForbiddenException('A business owner account is required');
+    }
   }
 }
