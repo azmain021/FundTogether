@@ -105,3 +105,29 @@ export type PublishedCampaign = Pick<Campaign, '_id' | 'title' | 'fundingTarget'
 };
 
 export type PublishedCampaignDetail = PublishedCampaign & Pick<Campaign, 'description' | 'purpose' | 'useOfFunds'> & { acceptingInvestments: boolean };
+export type MarketplaceStatus = 'active' | 'funded';
+
+export type MarketplaceSort =
+  | 'newest'
+  | 'ending_soon'
+  | 'most_funded'
+  | 'least_remaining';
+
+export type MarketplaceCampaignQuery = {
+  q?: string;
+  sector?: BusinessSector;
+  division?: string;
+  district?: string;
+  minTarget?: number;
+  maxTarget?: number;
+  status?: MarketplaceStatus;
+  sort?: MarketplaceSort;
+  page?: number;
+  limit?: number;
+};
+
+export type MarketplaceCampaignResponse = {
+  items: PublishedCampaign[];
+  page: number;
+  total: number;
+};
