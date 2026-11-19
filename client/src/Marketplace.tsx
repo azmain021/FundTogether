@@ -9,6 +9,8 @@ import type {
   PublishedCampaign,
 } from "./api/types";
 import AccountLinks from "./auth/AccountLinks";
+import WatchlistButton from "./watchlists/WatchlistButton";
+import { useWatchlist } from "./watchlists/use-watchlist";
 
 const taka = new Intl.NumberFormat("en-BD");
 
@@ -33,6 +35,7 @@ const sortOptions: Array<{ value: MarketplaceSort; label: string }> = [
 
 function formatSector(value?: string) {
   if (!value) return "Uncategorized";
+
   return value
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -76,9 +79,27 @@ function readQuery(params: URLSearchParams): MarketplaceCampaignQuery {
   };
 }
 
-function CampaignCard({ campaign }: { campaign: PublishedCampaign }) {
+function CampaignCard({
+  campaign,
+  watchlistEnabled,
+  watchlistReady,
+  saved,
+  pending,
+  onToggle,
+}: {
+  campaign: PublishedCampaign;
+  watchlistEnabled: boolean;
+  watchlistReady: boolean;
+  saved: boolean;
+  pending: boolean;
+  onToggle: (campaignId: string) => void;
+}) {
   const business = campaign.businessSnapshot;
-  const fundedUnits = Math.max(0, campaign.totalUnits - campaign.remainingUnits);
+  const fundedUnits = Math.max(
+    0,
+    campaign.totalUnits - campaign.remainingUnits,
+  );
+
   const progress =
     campaign.totalUnits > 0
       ? Math.round((fundedUnits / campaign.totalUnits) * 100)
@@ -94,9 +115,22 @@ function CampaignCard({ campaign }: { campaign: PublishedCampaign }) {
         <span className="rounded-full bg-[#EDF2F7] px-3 py-1 text-xs font-semibold text-[#334E68]">
           {formatSector(business?.sector)}
         </span>
-        <span className="rounded-full bg-[#ECFDF5] px-3 py-1 text-xs font-bold text-[#047857]">
-          {campaign.status === "funded" ? "Funded" : "Active"}
-        </span>
+
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-[#ECFDF5] px-3 py-1 text-xs font-bold text-[#047857]">
+            {campaign.status === "funded" ? "Funded" : "Active"}
+          </span>
+
+          {watchlistEnabled && (
+            <WatchlistButton
+              campaignId={campaign._id}
+              saved={saved}
+              pending={pending}
+              disabled={!watchlistReady}
+              onToggle={onToggle}
+            />
+          )}
+        </div>
       </div>
 
       <h2 className="mt-5 text-xl font-bold text-[#102A43]">
@@ -108,7 +142,9 @@ function CampaignCard({ campaign }: { campaign: PublishedCampaign }) {
       )}
 
       {location && (
-        <p className="mt-2 text-sm text-[#627D98]">{location}, Bangladesh</p>
+        <p className="mt-2 text-sm text-[#627D98]">
+          {location}, Bangladesh
+        </p>
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-4 border-y border-[#E8EEF2] py-4">
@@ -118,6 +154,7 @@ function CampaignCard({ campaign }: { campaign: PublishedCampaign }) {
             ৳{taka.format(campaign.fundingTarget)}
           </p>
         </div>
+
         <div className="border-l border-[#E8EEF2] pl-4">
           <p className="text-xs text-[#627D98]">Virtual raised</p>
           <p className="mt-1 font-bold text-[#102A43]">
@@ -131,6 +168,7 @@ function CampaignCard({ campaign }: { campaign: PublishedCampaign }) {
           <span className="text-[#627D98]">Funding progress</span>
           <span className="font-bold text-[#047857]">{progress}%</span>
         </div>
+
         <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#E7EDF2]">
           <div
             className="h-full rounded-full bg-[#059669]"
@@ -167,6 +205,7 @@ export default function Marketplace() {
     [queryKey],
   );
 
+  const watchlist = useWatchlist();
   const [retry, setRetry] = useState(0);
   const requestKey = `${queryKey}|${retry}`;
 
@@ -357,7 +396,9 @@ export default function Marketplace() {
                     type="number"
                     min="1"
                     value={query.minTarget?.toString() ?? ""}
-                    onChange={(event) => setFilter("minTarget", event.target.value)}
+                    onChange={(event) =>
+                      setFilter("minTarget", event.target.value)
+                    }
                     placeholder="Virtual taka"
                     className="h-11 w-full rounded-lg border border-[#D9E2EC] px-3 text-sm outline-none focus:border-[#059669]"
                   />
@@ -371,7 +412,9 @@ export default function Marketplace() {
                     type="number"
                     min="1"
                     value={query.maxTarget?.toString() ?? ""}
-                    onChange={(event) => setFilter("maxTarget", event.target.value)}
+                    onChange={(event) =>
+                      setFilter("maxTarget", event.target.value)
+                    }
                     placeholder="Virtual taka"
                     className="h-11 w-full rounded-lg border border-[#D9E2EC] px-3 text-sm outline-none focus:border-[#059669]"
                   />
@@ -413,7 +456,9 @@ export default function Marketplace() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 py-6">
               <p aria-live="polite" className="text-sm font-semibold">
-                {loading ? "Loading campaigns…" : `${data?.total ?? 0} campaigns found`}
+                {loading
+                  ? "Loading campaigns…"
+                  : `${data?.total ?? 0} campaigns found`}
               </p>
 
               {hasFilters && (
@@ -427,8 +472,17 @@ export default function Marketplace() {
               )}
             </div>
 
+            {watchlist.enabled && watchlist.error && (
+              <p role="alert" className="mb-4 text-sm text-red-700">
+                Watchlist: {watchlist.error}
+              </p>
+            )}
+
             {error && (
-              <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">
+              <div
+                role="alert"
+                className="rounded-xl bg-red-50 p-4 text-sm text-red-800"
+              >
                 {error}{" "}
                 <button
                   type="button"
@@ -450,7 +504,15 @@ export default function Marketplace() {
               <>
                 <div className="grid auto-rows-fr gap-6 md:grid-cols-2 xl:grid-cols-3">
                   {data.items.map((campaign) => (
-                    <CampaignCard key={campaign._id} campaign={campaign} />
+                    <CampaignCard
+                      key={campaign._id}
+                      campaign={campaign}
+                      watchlistEnabled={watchlist.enabled}
+                      watchlistReady={watchlist.ready}
+                      saved={watchlist.isSaved(campaign._id)}
+                      pending={watchlist.updatingId === campaign._id}
+                      onToggle={watchlist.toggle}
+                    />
                   ))}
                 </div>
 
@@ -486,7 +548,9 @@ export default function Marketplace() {
             {!loading && !error && data && data.items.length === 0 && (
               <div className="rounded-2xl border border-dashed border-[#BCCCDC] bg-white px-6 py-16 text-center">
                 <h2 className="text-xl font-bold">
-                  {hasFilters ? "No campaigns found" : "No published campaigns yet"}
+                  {hasFilters
+                    ? "No campaigns found"
+                    : "No published campaigns yet"}
                 </h2>
                 <p className="mt-2 text-sm text-[#627D98]">
                   {hasFilters
@@ -510,7 +574,8 @@ export default function Marketplace() {
       </main>
 
       <footer className="bg-[#0B2135] py-8 text-center text-xs text-[#B7C9D8]">
-        FundTogether is an educational simulation. No real investments or money transfers occur.
+        FundTogether is an educational simulation. No real investments or money
+        transfers occur.
       </footer>
     </div>
   );

@@ -12,6 +12,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { FeatureModelsModule } from './database/feature-models.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { InvestmentsModule } from './investments/investments.module';
+import { WatchlistsModule } from './watchlists/watchlists.module';
 
 
 @Module({
@@ -35,6 +36,8 @@ import { InvestmentsModule } from './investments/investments.module';
     FeatureModelsModule,
     WalletsModule,
     InvestmentsModule,
+       
+    WatchlistsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

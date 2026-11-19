@@ -131,3 +131,29 @@ export type MarketplaceCampaignResponse = {
   page: number;
   total: number;
 };
+
+export type WatchlistCampaign = {
+  _id: string;
+  title: string;
+  fundingTarget: number;
+  unitPrice: number;
+  totalUnits: number;
+  remainingUnits: number;
+  status: CampaignStatus;
+  startsAt?: string;
+  endsAt?: string;
+  businessSnapshot?: {
+    name: string;
+    sector: BusinessSector;
+    division: string;
+    district: string;
+  };
+  purchasedUnits: number;
+  fundingProgress: number;
+};
+
+export type WatchlistItem = {
+  _id: string;
+  savedAt: string;
+  campaign: WatchlistCampaign;
+};
