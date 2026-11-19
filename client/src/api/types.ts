@@ -45,7 +45,7 @@ export type BusinessInput = {
   district: string;
   address: string;
   description: string;
-  website?: string;
+  website?: string | null;
   businessEmail: string;
   contactPhone: string;
 };

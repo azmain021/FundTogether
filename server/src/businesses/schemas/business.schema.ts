@@ -12,9 +12,12 @@ import { User } from '../../users/schemas/user.schema';
 // are server-managed and are never accepted from request bodies.
 @Schema({ collection: 'businesses', timestamps: true, versionKey: false })
 export class Business {
-  // Set from the authenticated session once auth exists; never from the client.
-  @Prop({ type: Types.ObjectId, ref: User.name, index: true })
-  ownerId?: Types.ObjectId;
+  // Always set from the authenticated session, never from a request body.
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  ownerId: Types.ObjectId;
+
+  @Prop({ default: 0, select: false })
+  onboardingVersion: number;
 
   @Prop({ required: true, trim: true, maxlength: 150 })
   officialName: string;
@@ -49,8 +52,8 @@ export class Business {
   @Prop({ required: true, trim: true, maxlength: 2000 })
   description: string;
 
-  @Prop({ trim: true })
-  website?: string;
+  @Prop({ type: String, trim: true })
+  website?: string | null;
 
   @Prop({ required: true, trim: true, lowercase: true })
   businessEmail: string;
@@ -78,3 +81,8 @@ export class Business {
 
 export type BusinessDocument = HydratedDocument<Business>;
 export const BusinessSchema = SchemaFactory.createForClass(Business);
+BusinessSchema.index({ ownerId: 1 }, {
+  name: 'one_active_business_per_owner',
+  unique: true,
+  partialFilterExpression: { deletedAt: null, ownerId: { $type: 'objectId' } },
+});

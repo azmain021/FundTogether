@@ -3,3 +3,4 @@ packages:
   - server
 allowBuilds:
   '@parcel/watcher': true
+  argon2: true

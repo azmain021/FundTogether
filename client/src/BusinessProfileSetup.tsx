@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError } from "./api/client";
-import { createBusiness, getBusiness, updateBusiness } from "./api/businesses";
+import { createBusiness, getMyBusiness, updateBusiness } from "./api/businesses";
+import { useSession } from "./auth/session";
+import AccountLinks from "./auth/AccountLinks";
 import type {
   Business,
   BusinessInput,
@@ -105,27 +107,6 @@ const businessSizes: Option<BusinessSize>[] = [
   { value: "large", label: "Large Business" },
 ];
 
-// Until sign-in exists there is no GET /businesses/me, so the saved profile's ID
-// is remembered in this browser to reload it from the server after a refresh.
-const SAVED_BUSINESS_KEY = "fundtogether.businessId";
-
-const readSavedBusinessId = () => {
-  try {
-    return window.localStorage.getItem(SAVED_BUSINESS_KEY);
-  } catch {
-    return null;
-  }
-};
-
-const writeSavedBusinessId = (id: string | null) => {
-  try {
-    if (id) window.localStorage.setItem(SAVED_BUSINESS_KEY, id);
-    else window.localStorage.removeItem(SAVED_BUSINESS_KEY);
-  } catch {
-    // Storage unavailable (private mode); the profile is still saved on the server.
-  }
-};
-
 const emptyForm = {
   officialName: "",
   businessType: "",
@@ -175,8 +156,8 @@ const toInput = (form: ProfileForm): BusinessInput => ({
   description: form.description,
   businessEmail: form.businessEmail,
   contactPhone: form.contactPhone,
-  ...(form.operatingHistory.trim() ? { operatingHistory: form.operatingHistory } : {}),
-  ...(form.website.trim() ? { website: form.website } : {}),
+  operatingHistory: form.operatingHistory,
+  website: form.website,
 });
 
 type Feedback = { tone: "success" | "error"; text: string; details?: string[] } | null;
@@ -246,6 +227,7 @@ function TextField({
   type = "text",
   required = true,
   autoComplete,
+  disabled = false,
 }: {
   id: string;
   label: string;
@@ -255,6 +237,7 @@ function TextField({
   type?: string;
   required?: boolean;
   autoComplete?: string;
+  disabled?: boolean;
 }) {
   return (
     <FieldShell id={id} label={label}>
@@ -265,6 +248,7 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
+        disabled={disabled}
         autoComplete={autoComplete}
         className="h-12 w-full rounded-xl border border-[#CBD5E1] bg-white px-4 text-sm text-[#102A43] outline-none transition placeholder:text-[#9FB3C8] focus:border-[#059669] focus:ring-4 focus:ring-[#059669]/10"
       />
@@ -279,6 +263,7 @@ function SelectField({
   options,
   value,
   onChange,
+  disabled = false,
 }: {
   id: string;
   label: string;
@@ -286,6 +271,7 @@ function SelectField({
   options: Option<string>[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <FieldShell id={id} label={label}>
@@ -294,6 +280,7 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required
+        disabled={disabled}
         className="h-12 w-full rounded-xl border border-[#CBD5E1] bg-white px-4 text-sm text-[#102A43] outline-none transition focus:border-[#059669] focus:ring-4 focus:ring-[#059669]/10"
       >
         <option value="" disabled>
@@ -332,26 +319,30 @@ function StepMarker({ state, number }: { state: (typeof steps)[number]["state"];
 }
 
 export default function BusinessProfileSetup() {
+  const { user } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
-  const [businessId, setBusinessId] = useState<string | null>(readSavedBusinessId);
-  const [loading, setLoading] = useState(businessId !== null);
+  const [businessId, setBusinessId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<Business['verificationStatus']>('draft');
+  const identityLocked = verificationStatus === 'pending' || verificationStatus === 'approved';
   const [saving, setSaving] = useState(false);
 
   // Reload a previously saved profile from the server (proves it persisted).
   useEffect(() => {
-    if (!businessId) return;
     const controller = new AbortController();
-    getBusiness(businessId, controller.signal)
-      .then((business) => setForm(toForm(business)))
+    getMyBusiness(controller.signal)
+      .then((business) => {
+        if (controller.signal.aborted) return;
+        setBusinessId(business?._id ?? null);
+        setVerificationStatus(business?.verificationStatus ?? 'draft');
+        setForm(business ? toForm(business) : { ...emptyForm, businessEmail: user?.email ?? '', contactPhone: user?.phone ?? '' });
+      })
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
-          writeSavedBusinessId(null);
-          setBusinessId(null);
-          return;
-        }
+        if (controller.signal.aborted) return;
+        setLoadFailed(true);
         setFeedback({
           tone: "error",
           text: error instanceof Error ? error.message : "Could not load your saved profile.",
@@ -361,9 +352,7 @@ export default function BusinessProfileSetup() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-    // Only on first load; later saves update the form directly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id, user?.email, user?.phone]);
 
   const updateField = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -372,7 +361,7 @@ export default function BusinessProfileSetup() {
 
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (saving) return;
+    if (saving || loading || loadFailed) return;
     setSaving(true);
     setFeedback(null);
     try {
@@ -380,13 +369,14 @@ export default function BusinessProfileSetup() {
       const saved = businessId
         ? await updateBusiness(businessId, input)
         : await createBusiness(input);
-      writeSavedBusinessId(saved._id);
       setBusinessId(saved._id);
+      setVerificationStatus(saved.verificationStatus);
       setForm(toForm(saved));
       setFeedback({
         tone: "success",
         text: `Business profile for ${saved.officialName} has been saved. Document Submission is the next onboarding step.`,
       });
+      if (!businessId) window.location.assign('/business/documents');
     } catch (error) {
       setFeedback({
         tone: "error",
@@ -415,12 +405,7 @@ export default function BusinessProfileSetup() {
             </a>
           </nav>
           <div className="hidden items-center gap-5 lg:flex">
-            <a
-              href="/business/register"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D9E2EC] bg-white px-4 text-sm font-semibold text-[#102A43] transition hover:bg-[#F8FAFC]"
-            >
-              <ArrowLeft /> Account Registration
-            </a>
+            <AccountLinks />
           </div>
           <button
             type="button"
@@ -442,7 +427,7 @@ export default function BusinessProfileSetup() {
                 ["Explore", "/marketplace"],
                 ["How It Works", "/#how-it-works"],
                 ["About", "/#about"],
-                ["Account Registration", "/business/register"],
+                ["Application Status", "/business/review-status"],
               ].map(([label, href]) => (
                 <a
                   key={label}
@@ -565,15 +550,18 @@ export default function BusinessProfileSetup() {
                 </div>
 
                 <form onSubmit={saveProfile} className="mt-7" aria-busy={loading || saving}>
+                  {identityLocked && <p className="mb-5 rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800">Business name, type and sector are locked while your business is pending review or approved.</p>}
+                  {loadFailed && <p role="alert" className="mb-5 text-sm text-red-700">Your profile could not be loaded. <button type="button" onClick={() => window.location.reload()} className="font-bold underline">Reload to try again</button></p>}
                   {loading && (
                     <p className="mb-5 text-xs font-semibold text-[#526B82]" role="status">
                       Loading your saved profile…
                     </p>
                   )}
-                  <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
+                  <fieldset disabled={loading || saving || loadFailed} className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <TextField
                         id="official-business-name"
+                        disabled={identityLocked}
                         label="Official Business Name"
                         placeholder="Enter the registered business name"
                         value={form.officialName}
@@ -583,6 +571,7 @@ export default function BusinessProfileSetup() {
                     </div>
                     <SelectField
                       id="business-type"
+                      disabled={identityLocked}
                       label="Business Type"
                       placeholder="Select the legal form"
                       options={businessTypes}
@@ -591,6 +580,7 @@ export default function BusinessProfileSetup() {
                     />
                     <SelectField
                       id="business-sector"
+                      disabled={identityLocked}
                       label="Business Sector"
                       placeholder="Select a sector"
                       options={sectors}
@@ -716,7 +706,7 @@ export default function BusinessProfileSetup() {
                       onChange={(value) => updateField("contactPhone", value)}
                       autoComplete="tel"
                     />
-                  </div>
+                  </fieldset>
 
                   <div className="mt-7 rounded-xl border border-[#DCE7ED] bg-[#F8FAFC] px-4 py-3.5">
                     <p className="text-xs leading-5 text-[#526B82]">
@@ -748,20 +738,21 @@ export default function BusinessProfileSetup() {
 
                   <div className="mt-7 flex flex-col-reverse justify-between gap-3 border-t border-[#E3EAF0] pt-6 sm:flex-row">
                     <a
-                      href="/business/register"
+                      href="/business/review-status"
                       className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#CBD5E1] bg-white px-6 text-sm font-bold text-[#102A43] transition hover:bg-[#F8FAFC]"
                     >
                       <ArrowLeft /> Back
                     </a>
                     <button
                       type="submit"
-                      disabled={loading || saving}
+                      disabled={loading || saving || loadFailed}
                       className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#059669] px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,.2)] transition hover:bg-[#047857] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {saving ? "Saving…" : businessId ? "Save Changes" : "Save & Continue"}{" "}
                       <ArrowRight />
                     </button>
                   </div>
+                  {businessId && <a href="/business/documents" className="mt-5 inline-flex text-sm font-bold text-[#047857]">Continue to Documents →</a>}
                 </form>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import AccountLinks from "./auth/AccountLinks";
 
 type IconProps = { className?: string };
 
@@ -286,12 +287,12 @@ function OpportunityCard({ item }: { item: (typeof opportunities)[number] }) {
           <p className="text-xs text-[#64748B]">
             Simulated units from <span className="font-bold text-[#102A43]">{item.unit}</span>
           </p>
-          <a
-            href="#disclaimer"
+          {item.name === "Shobuj Bazar" ? <a
+            href="/campaigns/shobuj-bazar"
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#059669] hover:text-[#047857]"
           >
             View demo campaign <ArrowRight className="h-4 w-4" />
-          </a>
+          </a> : <span className="text-xs font-semibold text-[#829AB1]">Details coming soon</span>}
         </div>
       </div>
     </article>
@@ -320,15 +321,7 @@ export default function App() {
             </a>
           </nav>
           <div className="hidden items-center gap-5 lg:flex">
-            <a
-              href="#disclaimer"
-              className="text-sm font-semibold text-[#334E68] transition-colors hover:text-[#059669]"
-            >
-              Log in
-            </a>
-            <Button href="#opportunities" className="min-h-10 px-5">
-              Get Started
-            </Button>
+            <AccountLinks />
           </div>
           <button
             type="button"
@@ -350,7 +343,6 @@ export default function App() {
                 ["Explore", "/marketplace"],
                 ["How It Works", "#how-it-works"],
                 ["About", "#about"],
-                ["Log in", "#disclaimer"],
               ].map(([label, href]) => (
                 <a
                   key={label}
@@ -361,9 +353,7 @@ export default function App() {
                   {label}
                 </a>
               ))}
-              <Button href="#opportunities" className="mt-3">
-                Get Started
-              </Button>
+              <AccountLinks mobile />
             </div>
           </nav>
         )}
@@ -390,7 +380,7 @@ export default function App() {
                 <Button href="/marketplace">
                   Explore Opportunities <ArrowRight />
                 </Button>
-                <Button href="#raise-funding" variant="secondary">
+                <Button href="/business/register" variant="secondary">
                   Raise Funding
                 </Button>
               </div>
@@ -455,7 +445,7 @@ export default function App() {
                       <p className="mt-0.5 text-sm font-bold text-[#102A43]">From ৳1,000</p>
                     </div>
                     <a
-                      href="#disclaimer"
+                      href="/campaigns/shobuj-bazar"
                       className="inline-flex items-center gap-2 rounded-lg bg-[#102A43] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#183B56]"
                     >
                       View demo campaign <ArrowRight className="h-4 w-4" />
@@ -514,7 +504,7 @@ export default function App() {
                 </p>
               </div>
               <a
-                href="#disclaimer"
+                href="/marketplace"
                 className="inline-flex items-center gap-2 text-sm font-bold text-[#059669] hover:text-[#047857]"
               >
                 View all opportunities <ArrowRight className="h-4 w-4" />
@@ -664,7 +654,7 @@ export default function App() {
                     </span>
                   </div>
                 </div>
-                <Button href="#disclaimer" variant="light" className="w-fit">
+                <Button href="/business/register" variant="light" className="w-fit">
                   Start your application <ArrowRight />
                 </Button>
               </div>

@@ -4,6 +4,11 @@ import App from "./App";
 import CampaignDetails from "./CampaignDetails";
 import Marketplace from "./Marketplace";
 import "./index.css";
+import SessionProvider from "./auth/SessionProvider";
+import SessionGate from "./auth/SessionGate";
+
+const Login = React.lazy(() => import("./Login"));
+const AccountTypeSelection = React.lazy(() => import("./AccountTypeSelection"));
 
 const BusinessRegistration = React.lazy(() => import("./BusinessRegistration"));
 const BusinessProfileSetup = React.lazy(() => import("./BusinessProfileSetup"));
@@ -58,6 +63,8 @@ function Router() {
         url.origin !== window.location.origin ||
         (destination !== "/" &&
           destination !== "/marketplace" &&
+          destination !== "/login" &&
+          destination !== "/register" &&
           destination !== campaignDetailsPath &&
           destination !== businessRegistrationPath &&
           destination !== businessProfilePath &&
@@ -96,7 +103,9 @@ function Router() {
   }, [location]);
 
   if (path === "/marketplace") return <Marketplace />;
-  if (path === campaignDetailsPath) return <CampaignDetails />;
+  if (path === "/login") return <Login next={new URLSearchParams(window.location.search).get("next") ?? ""} />;
+  if (path === "/register") return <AccountTypeSelection />;
+  if (path === campaignDetailsPath) return <SessionGate><CampaignDetails /></SessionGate>;
   if (path === businessRegistrationPath) {
     return (
       <React.Suspense
@@ -119,7 +128,7 @@ function Router() {
           </div>
         }
       >
-        <BusinessProfileSetup />
+        <SessionGate ownerOnly><BusinessProfileSetup /></SessionGate>
       </React.Suspense>
     );
   }
@@ -132,7 +141,7 @@ function Router() {
           </div>
         }
       >
-        <BusinessDocumentSubmission />
+        <SessionGate ownerOnly><BusinessDocumentSubmission /></SessionGate>
       </React.Suspense>
     );
   }
@@ -145,7 +154,7 @@ function Router() {
           </div>
         }
       >
-        <DocumentReviewStatus />
+        <SessionGate ownerOnly><DocumentReviewStatus /></SessionGate>
       </React.Suspense>
     );
   }
@@ -154,6 +163,10 @@ function Router() {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Router />
+    <SessionProvider>
+      <React.Suspense fallback={<div role="status" className="grid min-h-screen place-items-center bg-[#F6F9FB] text-sm text-[#526B82]">Loading page…</div>}>
+        <Router />
+      </React.Suspense>
+    </SessionProvider>
   </React.StrictMode>,
 );

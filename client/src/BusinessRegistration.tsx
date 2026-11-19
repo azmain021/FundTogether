@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { registerBusinessOwner } from "./api/auth";
+import { ApiError } from "./api/client";
 
 type IconProps = { className?: string };
 
@@ -90,17 +92,6 @@ const Close = ({ className = "h-6 w-6" }: IconProps) => (
     <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
   </svg>
 );
-
-const categories = [
-  "Grocery",
-  "Restaurant",
-  "Bakery",
-  "Clothing",
-  "Agriculture",
-  "Manufacturing",
-  "Renewable Energy",
-  "Other",
-];
 
 const steps = [
   {
@@ -232,13 +223,12 @@ export default function BusinessRegistration() {
     phone: "",
     password: "",
     confirmPassword: "",
-    businessName: "",
-    category: "",
-    location: "",
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [message, setMessage] = useState("");
   const [hasError, setHasError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   const updateField = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -246,8 +236,9 @@ export default function BusinessRegistration() {
     setHasError(false);
   };
 
-  const submitRegistration = (event: FormEvent<HTMLFormElement>) => {
+  const submitRegistration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saving || registered) return;
     if (form.password !== form.confirmPassword) {
       setHasError(true);
       setMessage("Your password and confirmation do not match.");
@@ -259,9 +250,31 @@ export default function BusinessRegistration() {
       return;
     }
     setHasError(false);
-    setMessage(
-      `Demonstration registration prepared for ${form.businessName}. No account or campaign has been created, and no data has been submitted to a server.`,
-    );
+    setMessage("");
+    setSaving(true);
+    try {
+      const account = await registerBusinessOwner({
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        acceptedTerms,
+      });
+      setRegistered(true);
+      setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
+      setMessage(`Your business owner account for ${account.email} has been created. Log in to set up your business profile.`);
+    } catch (error: unknown) {
+      setHasError(true);
+      setMessage(
+        error instanceof ApiError && error.details.length > 0
+          ? error.details.join(" ")
+          : error instanceof Error
+            ? error.message
+            : "Could not create your account. Please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -282,7 +295,7 @@ export default function BusinessRegistration() {
           </nav>
           <div className="hidden items-center gap-5 lg:flex">
             <a
-              href="#existing-user"
+              href="/login"
               className="text-sm font-semibold text-[#334E68] transition-colors hover:text-[#059669]"
             >
               Log in
@@ -337,15 +350,14 @@ export default function BusinessRegistration() {
               Business owner onboarding
             </p>
             <h1 className="mt-3 text-[36px] font-bold leading-tight tracking-[-0.045em] text-[#102A43] sm:text-[44px]">
-              Register Your Business
+              Create Your Business Owner Account
             </h1>
             <p className="mx-auto mt-4 max-w-[650px] text-[15px] leading-7 text-[#526B82]">
               Create a business owner profile and learn how eligible businesses can apply to build
               simulated funding campaigns on FundTogether.
             </p>
             <p className="mx-auto mt-2 max-w-[600px] text-[11px] leading-5 text-[#829AB1]">
-              This onboarding page is a demonstration. Submitting the form does not create a real
-              account or store your information.
+              Create your account first. You will add your business details in the next step.
             </p>
           </div>
         </section>
@@ -427,8 +439,8 @@ export default function BusinessRegistration() {
                   <p className="text-[11px] text-[#829AB1]">All fields are required</p>
                 </div>
 
-                <form onSubmit={submitRegistration} className="mt-7">
-                  <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
+                <form onSubmit={submitRegistration} className="mt-7" aria-busy={saving}>
+                  <fieldset disabled={saving || registered} className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
                     <TextField
                       id="full-name"
                       label="Full name"
@@ -455,14 +467,6 @@ export default function BusinessRegistration() {
                       value={form.phone}
                       onChange={(value) => updateField("phone", value)}
                     />
-                    <TextField
-                      id="business-name"
-                      label="Business name"
-                      autoComplete="organization"
-                      placeholder="Enter your business name"
-                      value={form.businessName}
-                      onChange={(value) => updateField("businessName", value)}
-                    />
                     <PasswordField
                       id="password"
                       label="Password"
@@ -479,40 +483,12 @@ export default function BusinessRegistration() {
                       value={form.confirmPassword}
                       onChange={(value) => updateField("confirmPassword", value)}
                     />
-                    <label htmlFor="business-category" className="block">
-                      <span className="mb-2 block text-xs font-bold text-[#334E68]">
-                        Business category
-                      </span>
-                      <span className="relative block">
-                        <select
-                          id="business-category"
-                          value={form.category}
-                          onChange={(event) => updateField("category", event.target.value)}
-                          required
-                          className="h-12 w-full rounded-xl border border-[#CBD5E1] bg-white px-4 text-sm text-[#102A43] outline-none transition focus:border-[#059669] focus:ring-4 focus:ring-[#059669]/10"
-                        >
-                          <option value="" disabled>
-                            Select a category
-                          </option>
-                          {categories.map((category) => (
-                            <option key={category}>{category}</option>
-                          ))}
-                        </select>
-                      </span>
-                    </label>
-                    <TextField
-                      id="business-location"
-                      label="Business location"
-                      autoComplete="street-address"
-                      placeholder="City or district in Bangladesh"
-                      value={form.location}
-                      onChange={(value) => updateField("location", value)}
-                    />
-                  </div>
+                  </fieldset>
 
                   <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-[#E3EAF0] bg-[#F8FAFC] p-4">
                     <input
                       type="checkbox"
+                      disabled={saving || registered}
                       checked={acceptedTerms}
                       onChange={(event) => {
                         setAcceptedTerms(event.target.checked);
@@ -526,15 +502,14 @@ export default function BusinessRegistration() {
                       <a href="#registration-notice" className="font-bold text-[#059669]">
                         Terms and Conditions
                       </a>{" "}
-                      and acknowledge that FundTogether campaigns and this registration experience
-                      are simulated.
+                      and acknowledge that all funding activity on FundTogether is simulated.
                     </span>
                   </label>
 
                   {message && (
                     <div
                       className={`mt-5 rounded-xl border p-4 text-xs font-semibold leading-5 ${hasError ? "border-[#F3C7C7] bg-[#FFF5F5] text-[#B42318]" : "border-[#BDE8D9] bg-[#ECFDF5] text-[#047857]"}`}
-                      role="status"
+                      role={hasError ? "alert" : "status"}
                       aria-live="polite"
                     >
                       <div className="flex gap-2.5">
@@ -546,14 +521,23 @@ export default function BusinessRegistration() {
 
                   <button
                     type="submit"
-                    className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#059669] px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,.2)] transition hover:bg-[#047857] sm:w-auto"
+                    disabled={saving || registered}
+                    className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#059669] px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,.2)] transition hover:bg-[#047857] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
-                    Create Account <ArrowRight />
+                    {saving ? "Creating Account…" : registered ? "Account Created" : "Create Account"} <ArrowRight />
                   </button>
+                  {registered && (
+                    <a
+                      href="/login?registered=1&next=%2Fbusiness%2Fprofile"
+                      className="mt-4 flex items-center gap-2 text-sm font-bold text-[#059669]"
+                    >
+                      Log in to Continue <ArrowRight />
+                    </a>
+                  )}
                   <p id="existing-user" className="mt-6 text-sm text-[#627D98]">
                     Already have an account?{" "}
                     <a
-                      href="#registration-notice"
+                      href="/login"
                       className="font-bold text-[#059669] hover:text-[#047857]"
                     >
                       Log in
@@ -582,8 +566,8 @@ export default function BusinessRegistration() {
             <div className="max-w-[560px] rounded-xl bg-white/[.04] px-4 py-3">
               <p className="text-[10px] leading-5 text-[#92A9BA]">
                 <strong className="font-semibold text-[#C8D6E0]">Registration notice:</strong> This
-                form is a frontend demonstration. It does not create an account, store credentials,
-                submit personal data or initiate a real funding campaign.
+                form creates a business owner account. Your password is stored as a hash. Business
+                verification is a separate step, and all funding activity is simulated.
               </p>
             </div>
           </div>

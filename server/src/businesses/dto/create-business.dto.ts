@@ -76,8 +76,9 @@ export class CreateBusinessDto {
 
   @Trim()
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) => typeof value === 'string' && !value.trim() ? null : value)
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
-  website?: string;
+  website?: string | null;
 
   @Trim()
   @IsEmail()

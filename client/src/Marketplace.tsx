@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import AccountLinks from "./auth/AccountLinks";
 
 type IconProps = { className?: string };
 
@@ -312,12 +313,12 @@ function CampaignCard({ campaign }: { campaign: (typeof campaigns)[number] }) {
             <p className="text-[10px] font-medium text-[#829AB1]">Simulated unit price</p>
             <p className="mt-0.5 text-sm font-bold text-[#102A43]">{campaign.unit}</p>
           </div>
-          <a
-            href="#marketplace-notice"
+          {campaign.name === "Shobuj Bazar" ? <a
+            href="/campaigns/shobuj-bazar"
             className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#102A43] px-4 text-xs font-bold text-white transition-colors hover:bg-[#183B56]"
           >
             View Details <ArrowRight />
-          </a>
+          </a> : <span className="text-xs font-semibold text-[#829AB1]">Details coming soon</span>}
         </div>
       </div>
     </article>
@@ -378,18 +379,7 @@ export default function Marketplace() {
             </a>
           </nav>
           <div className="hidden items-center gap-5 lg:flex">
-            <a
-              href="#marketplace-notice"
-              className="text-sm font-semibold text-[#334E68] transition-colors hover:text-[#059669]"
-            >
-              Log in
-            </a>
-            <a
-              href="#campaigns"
-              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#059669] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(5,150,105,.2)] transition hover:bg-[#047857]"
-            >
-              Get Started
-            </a>
+            <AccountLinks />
           </div>
           <button
             type="button"
@@ -411,7 +401,6 @@ export default function Marketplace() {
                 ["Explore", "/marketplace"],
                 ["How It Works", "/#how-it-works"],
                 ["About", "/#about"],
-                ["Log in", "#marketplace-notice"],
               ].map(([label, href]) => (
                 <a
                   key={label}
@@ -422,6 +411,7 @@ export default function Marketplace() {
                   {label}
                 </a>
               ))}
+              <AccountLinks mobile />
             </div>
           </nav>
         )}

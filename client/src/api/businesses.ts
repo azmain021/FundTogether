@@ -1,6 +1,9 @@
 import { apiRequest } from "./client";
 import type { Business, BusinessInput } from "./types";
 
+export const getMyBusiness = (signal?: AbortSignal) =>
+  apiRequest<Business | null>("/businesses/me", { signal });
+
 export const createBusiness = (input: BusinessInput) =>
   apiRequest<Business>("/businesses", { method: "POST", body: input });
 
