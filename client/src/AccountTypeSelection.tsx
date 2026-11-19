@@ -17,7 +17,7 @@ export default function AccountTypeSelection() {
               <span className="text-xs font-bold uppercase tracking-widest text-[#829AB1]">Investor</span>
               <h2 className="mt-4 text-2xl font-bold">Discover businesses</h2>
               <p className="mt-3 grow text-sm leading-6 text-[#526B82]">Explore opportunities and participate using a virtual balance.</p>
-              <button disabled className="mt-8 rounded-xl bg-[#EDF2F7] px-4 py-3 text-sm font-semibold text-[#64748B]">Investor registration — coming soon</button>
+              <a href="/investor/register" className="mt-8 rounded-xl bg-[#059669] px-4 py-3 text-center text-sm font-bold text-white hover:bg-[#047857]">Create as Investor →</a>
             </section>
             <section className="flex flex-col rounded-3xl border border-[#059669] bg-white p-8 shadow-sm">
               <span className="text-xs font-bold uppercase tracking-widest text-[#059669]">Business Owner</span>

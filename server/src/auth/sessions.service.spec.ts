@@ -43,6 +43,15 @@ describe('SessionsService', () => {
     await expect(service.currentUser('a'.repeat(64))).rejects.toThrow(UnauthorizedException);
   });
 
+  it('rejects a session issued against an older password', async () => {
+    const { service, sessions, users } = setup();
+    sessions.findOne.mockReturnValueOnce({
+      exec: async () => ({ userId: new Types.ObjectId(), credentialVersion: 1 }),
+    });
+    users.findById.mockReturnValueOnce({ exec: async () => ({ isActive: true, credentialVersion: 2 }) });
+    await expect(service.currentUser('a'.repeat(64))).rejects.toThrow(UnauthorizedException);
+  });
+
   it('revokes by token hash and tolerates logout without a cookie', async () => {
     const { service, sessions } = setup();
     await service.revoke(undefined);

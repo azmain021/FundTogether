@@ -12,6 +12,9 @@ export class Session {
 
   @Prop({ required: true })
   expiresAt: Date;
+
+  @Prop({ default: 0 })
+  credentialVersion: number;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

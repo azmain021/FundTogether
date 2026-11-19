@@ -100,7 +100,7 @@ export class OnboardingService {
     const document = await this.documents.findOne({ _id: documentId, deletedAt: null }).select('+storageKey').exec();
     if (!document) throw new NotFoundException('Document not found');
     await this.businessService.findForUser(document.businessId, actor);
-    return { bytes: await this.storage.read(document.storageKey), originalName: document.originalName, mimeType: document.mimeType };
+    return { stream: await this.storage.stream(document.storageKey), originalName: document.originalName, mimeType: document.mimeType };
   }
 
   async eligibility(businessId: Types.ObjectId, actor: Actor) {

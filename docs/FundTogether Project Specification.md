@@ -7,6 +7,8 @@
 **Status:** Living design specification; not a declaration that all features are implemented  
 **Document version:** 1.0 — 16 November 2026
 
+> The [Feature Plan](./FundTogether%20Feature%20Plan.md#3-shared-infrastructure-phase-0--not-counted) defines the current Phase 0 scope. It requires email/password accounts with password reset and the full database build. Email verification is deferred. The Google sign-in references and Phase 0 roadmap below reflect the earlier design.
+
 > **Safety and scope boundary:** Every balance, purchase, funding target, transaction and performance statistic on FundTogether is **simulated**. There is no real-money transfer, banking connection, payment gateway, legal investment issuance, settlement, guaranteed return or entitlement to business profits. UI text, API responses and demonstrations must not suggest otherwise.
 
 ## 1. Executive summary

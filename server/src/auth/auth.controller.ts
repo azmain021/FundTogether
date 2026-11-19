@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Header, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterBusinessOwnerDto } from './dto/register-business-owner.dto';
@@ -16,20 +17,28 @@ export class AuthController {
   ) {}
 
   @Post('register/business-owner')
-  @UseGuards(SessionOriginGuard)
+  @UseGuards(SessionOriginGuard, ThrottlerGuard)
   @Header('Cache-Control', 'no-store')
   registerBusinessOwner(@Body() dto: RegisterBusinessOwnerDto) {
     return this.authService.registerBusinessOwner(dto);
   }
 
+  @Post('register/investor')
+  @UseGuards(SessionOriginGuard, ThrottlerGuard)
+  @Header('Cache-Control', 'no-store')
+  registerInvestor(@Body() dto: RegisterBusinessOwnerDto) {
+    return this.authService.registerInvestor(dto);
+  }
+
   @Post('login')
   @HttpCode(200)
-  @UseGuards(SessionOriginGuard)
+  @UseGuards(SessionOriginGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 15, ttl: 900_000 } })
   @Header('Cache-Control', 'no-store')
   async login(@Body() dto: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const user = await this.authService.login(dto);
+    const { user, credentialVersion } = await this.authService.login(dto);
     // Issue a new random session on every login and revoke the browser's old one.
-    const token = await this.sessions.create(user.id);
+    const token = await this.sessions.create(user.id, credentialVersion);
     await this.sessions.revoke(sessionToken(request.headers.cookie));
     response.cookie(SESSION_COOKIE, token, { ...this.cookieOptions(), maxAge: SESSION_DURATION_MS });
     return user;

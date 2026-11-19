@@ -16,7 +16,7 @@
 Here is how we decide what counts as a feature:
 
 1. **Each feature must depend on the database.** It must perform meaningful MongoDB reads and/or writes that survive a refresh or server restart.
-2. **Authentication is not a feature.** Google sign-in, sessions, role onboarding and guards are **shared infrastructure** (Section 3).
+2. **Authentication is not a feature.** Email/password sign-up and sign-in, password reset, sessions, role onboarding and guards are **shared infrastructure** (Section 3).
 3. **CRUD operations, single screens and calculations are not separate features.** For example, create, read, update and delete for a campaign draft together make up **one** feature.
 4. **A read-only feature counts only if** changing the underlying records changes what it shows. It must not be a static page.
 5. **A feature is done only when** UI, API, validation, permissions and persistence all work together (Section 7).
@@ -54,7 +54,7 @@ Here is how we decide what counts as a feature:
 
 | Member | Phase 0 (shared) | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
 |---|---|---|---|---|---|
-| **1 — Business onboarding & verification** | Google auth + sessions | F1 | F2, F3 | F4, F5 | Integration & demo data |
+| **1 — Business onboarding & verification** | Email/password auth, password reset, and sessions | F1 | F2, F3 | F4, F5 | Integration & demo data |
 | **2 — Campaign management** | Roles, onboarding, guards | F6 | F7 | F8, F9 | F10 |
 | **3 — Investor discovery & records** | React shell, routing, API client | F11 | F12, F13 | F14 | F15 |
 | **4 — Transactions & oversight** | Seed script, storage helper, error envelope | F16, F19 | F18 | F17 | F20 |
@@ -63,23 +63,25 @@ Here is how we decide what counts as a feature:
 
 ## 3. Shared infrastructure (Phase 0 — not counted)
 
-This must exist before any feature can be demonstrated properly. Split it as the table above shows and finish it first.
+Phase 0 delivers shared infrastructure and the complete MongoDB schema for all 20 features. Feature APIs, screens, and business workflows follow the phases in Section 6.2.
 
 | Item | Implementation | Owner |
 |---|---|---|
-| **Google sign-in** | React uses Google Identity Services to obtain an ID token. `POST /api/auth/google` verifies it server-side with `google-auth-library` (issuer, audience = `GOOGLE_CLIENT_ID`, expiry). It then finds or creates a `users` record by `googleSub`. | M1 |
-| **Session** | Issue a short-lived JWT in an `HttpOnly`, `SameSite=Lax` cookie. Add `GET /api/auth/me` and `POST /api/auth/logout`. | M1 |
-| **Roles & onboarding** | `users.role ∈ {investor, business_owner, admin}`. `POST /api/users/onboarding` accepts only `investor` or `business_owner`. **Admins are created only by the seed script**, never through the API. | M2 |
-| **Guards** | `JwtAuthGuard`, `RolesGuard` with `@Roles(...)` and a `@CurrentUser()` decorator. **Ownership checks live in services**, e.g. `business.ownerId.equals(user._id)`. | M2 |
+| **Email/password auth** | Business owners and investors sign up with a normalized email address and password. The server stores an Argon2id password hash and authenticates all three roles through `POST /api/auth/login`. Admin accounts are seeded. Email verification is deferred. | M1 |
+| **Password reset** | Show a one-time recovery code on sign-up. A signed-in user can replace it with their current password. `POST /api/auth/reset-password` checks the email and saved code, then changes the password, consumes the code, and revokes sessions in one transaction. Store only the code hash. No email is sent. | M1 |
+| **Session** | Issue an opaque, revocable token in an `HttpOnly`, `SameSite=Lax` cookie. Store its hash and expiry in MongoDB. Provide `GET /api/auth/me` and `POST /api/auth/logout`. | M1 |
+| **Roles & onboarding** | `users.role ∈ {investor, business_owner, admin}`. Public registration provisions only `investor` or `business_owner`. **Admins are created only by the seed script**, never through the API. | M2 |
+| **Guards** | `SessionGuard`, `RolesGuard` with `@Roles(...)` and a `@CurrentUser()` decorator. **Ownership checks live in services**, e.g. `business.ownerId.equals(user._id)`. | M2 |
 | **Validation** | Install `class-validator` + `class-transformer`. Register a global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` and a `ParseObjectIdPipe` for `:id` params. | M2 |
 | **Shared enums & contracts** | `server/src/common/enums.ts` holds every status enum below. Agree on it **before** Phase 1 so members can build against the same shapes. | All |
+| **Full database build** | Register every Mongoose model in Section 4, including indexes and constraints. Verify initialization and indexes on a clean replica-set test database, and supply a migration path that preserves existing development records. | All |
 | **Error envelope** | Global exception filter returning `{ statusCode, code, message, path }`. | M4 |
 | **File storage helper** | `StorageService.save(buffer, ext) → storageKey` and `.stream(storageKey)`. Files go in `server/storage/` (Git-ignored), outside any public folder. | M4 |
 | **Seed script** | `pnpm --filter server seed` creates the admin, demo investors, an **approved demo business** (disclosed test fixture, see Phase 1), and active demo campaigns. | M4 |
 | **Cross-feature services** | `AuditService.record()` (F19) and `NotificationsService.notify()` (F18) publish their method signatures in Phase 0 so other features can call them from day one. | M4 |
 | **React shell** | Add React Router, an authenticated layout per role, a typed `api` client (`fetch` with `credentials: 'include'`), and loading/empty/error components. Wire existing prototype screens into routes. | M3 |
 
-**Environment variables** (`server/.env`, never committed): `MONGODB_URI`, `PORT`, `FRONTEND_ORIGIN`, `GOOGLE_CLIENT_ID`, `JWT_SECRET`, `STARTER_CREDIT`, `UPLOAD_DIR`, `AI_API_KEY`, `AI_MODEL`. Add each name with an empty value to `server/.env.example`.
+**Environment variables** (`server/.env`, never committed): `MONGODB_URI`, `MONGODB_DATABASE`, `PORT`, `FRONTEND_ORIGIN`, `STARTER_CREDIT`, `UPLOAD_DIR`, `AI_API_KEY`, `AI_MODEL`, `SEED_ADMIN_PASSWORD`, `SEED_DEMO_PASSWORD`. Commit placeholders and safe defaults only.
 
 **Money arithmetic:** Store every amount as an **integer of whole virtual taka**, and units as whole integers (D-07). Never use floating-point amounts.
 
@@ -91,7 +93,9 @@ This must exist before any feature can be demonstrated properly. Split it as the
 
 | Collection | Owner feature | Key fields | Indexes |
 |---|---|---|---|
-| `users` | Shared | `googleSub`, `email`, `displayName`, `role`, `isActive` | unique `googleSub` |
+| `users` | Shared | `email`, `passwordHash`, `displayName`, `phone`, `role`, `isActive`, `credentialVersion` | unique normalized `email` |
+| `sessions` | Shared | `userId`, `tokenHash`, `expiresAt`, `credentialVersion` | unique `tokenHash`, `userId`, TTL `expiresAt` |
+| `password_resets` | Shared | `userId`, `tokenHash`, `kind`, `expiresAt?` (legacy email records only) | unique `tokenHash`, unique `userId`, TTL `expiresAt` for legacy cleanup |
 | `businesses` | F1, F5 | profile fields, `ownerId`, `verificationStatus`, `verifiedAt`, `deletedAt?` | `ownerId`, `verificationStatus` |
 | `documents` | F2, F4 | `businessId`, `ownerId`, `type`, `storageKey`, `originalName`, `mimeType`, `sizeBytes`, `status`, `replacesDocumentId?` | `(businessId, type, createdAt)` |
 | `business_applications` | F3, F5 | `businessId`, `ownerId`, `round`, `status`, `checklist`, `submittedAt`, `decision?`, `decisionReason?`, `decidedBy?`, `decidedAt?` | `(status, submittedAt)`, `businessId` |
@@ -107,7 +111,9 @@ This must exist before any feature can be demonstrated properly. Split it as the
 | `notifications` | F18 | `recipientId`, `type`, `title`, `message`, `link`, `entityType`, `entityId`, `readAt?` | `(recipientId, readAt, createdAt)` |
 | `audit_events` | F19 | `actorId`, `actorRole`, `action`, `entityType`, `entityId`, `reason?`, `changes?` | `(entityType, entityId, createdAt)`, `(actorId, createdAt)`, `(action, createdAt)` |
 
-All collections use Mongoose `timestamps: true`.
+All collections use Mongoose `timestamps: true`. Phase 0 verifies uniqueness, required fields, reference types, and key indexes for these collections. The seed command must be safe to rerun on the designated development database without creating duplicate fixtures.
+
+Ledger entries store a positive whole-taka amount. The entry type determines whether it credits or debits the balance. Unique indexes enforce one starter credit per wallet, one debit per investment, and one receipt number per investment record across the platform. The audit log uses `actorRole: system` for automated jobs with no user actor.
 
 ```text
 business.verificationStatus  draft → pending → approved | rejected ; rejected → pending
@@ -117,6 +123,8 @@ document.status              uploaded → accepted | replacement_requested | rej
 campaign.status              draft → pending_review → approved → active → funded | expired → closed
                              pending_review → rejected → draft (edit) → pending_review (F8)
 transaction.type             starter_credit | investment_debit   (no refunds or top-ups, see D-06 / D-08)
+investment.status            confirmed
+analyticsReport.status       generated | failed
 ```
 
 ---
@@ -649,7 +657,7 @@ Admins get platform-wide statistics and reports on the review backlog.
 
 ```mermaid
 flowchart LR
-    P0[Phase 0: Auth, roles, guards, enums, seed, API client]
+    P0[Phase 0: Email/password auth, full database, seed, shared infrastructure]
     P0 --> F1 & F6 & F11 & F16 & F19 & F18
     F1 --> F2 --> F3 --> F4 --> F5
     F5 -. replaces seed gate .-> F6
@@ -673,7 +681,7 @@ Solid arrows mean "must exist first". Dotted arrows mean "is called by" or "impr
 
 | Phase | Goal | Features | Exit criteria |
 |---|---|---|---|
-| **0 — Foundations** | Everyone can log in with a real role and call a protected API | Shared infrastructure (Section 3) | Google login works for all three roles. A guarded test route returns `403` for the wrong role. The seed script runs. `enums.ts` and the collection list are agreed. |
+| **0 — Foundations** | Complete database and shared infrastructure | Sections 3–4 | Every planned model and index is verified on a replica-set test database. The seed command runs twice without duplicates. Owners and investors can register, all three roles can sign in, and a valid recovery code changes a password exactly once. A protected route returns `403` for the wrong role. Shared contracts are available. |
 | **1 — First persistent features** | The faculty's first milestone: real CRUD with MongoDB | F1, F6, F11, F16, F19 (writer) | Business profile and campaign draft CRUD persist in Atlas. Marketplace reads seeded active campaigns. Investors get a wallet. Audit events are written. **F6 uses the seeded approved business, and this fixture is disclosed in the demo.** |
 | **2 — Verification and publishing pipeline** | Submissions flow to admins, and admins publish | F2, F3, F7, F12, F13, F18 | Owners upload documents and submit applications. Campaigns can be submitted, approved and shown on the marketplace with a detail page. Notifications appear. |
 | **3 — Decisions and money movement** | Real gates and consistent purchases | F4, F5, F8, F9, F14, F17 | Per-document review, approve/reject, and the real campaign gate (remove the fixture). Revisions work. Purchases are transactional. Funded and expired transitions work. The portfolio works. |
@@ -694,9 +702,9 @@ Solid arrows mean "must exist first". Dotted arrows mean "is called by" or "impr
 |---|---|---|
 | End of Phase 0 | M2 → all | `@Roles`, `@CurrentUser`, `enums.ts` |
 | End of Phase 0 | M4 → all | `AuditService.record` / `NotificationsService.notify` signatures (they can write to the DB from Phase 1) |
-| Mid Phase 1 | M2 → M3 | Campaign schema incl. `businessSnapshot` so the marketplace queries real fields |
+| Mid Phase 1 | M2 → M3 | Campaign CRUD populates the Phase 0 schema and the marketplace queries real fields |
 | Mid Phase 2 | M1 → M2 | `BusinessesService.assertApproved()` (initially checks the seeded status) |
-| Start Phase 3 | M4 → M3 | `investments` / `transactions` schemas and seed purchases for F14/F15 |
+| Start Phase 3 | M4 → M3 | Seed purchases in the Phase 0 `investments` / `transactions` schemas for F14/F15 |
 | Mid Phase 3 | M2 ↔ M4 | `CampaignLifecycleService.markFundedIfSoldOut(session)` called inside F17's transaction |
 
 ---

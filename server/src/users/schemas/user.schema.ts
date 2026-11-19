@@ -29,6 +29,9 @@ export class User {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ default: 0 })
+  credentialVersion: number;
 }
 
 export type UserDocument = HydratedDocument<User>;

@@ -22,12 +22,13 @@ export class SessionsService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
-  async create(userId: string): Promise<string> {
+  async create(userId: string, credentialVersion = 0): Promise<string> {
     const token = randomBytes(32).toString('hex');
     await this.sessionModel.create({
       userId: new Types.ObjectId(userId),
       tokenHash: this.hash(token),
       expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
+      credentialVersion,
     });
     return token;
   }
@@ -40,7 +41,9 @@ export class SessionsService {
     }).exec();
     if (!session) throw new UnauthorizedException('Your session has expired. Please log in again');
     const user = await this.userModel.findById(session.userId).exec();
-    if (!user?.isActive) throw new UnauthorizedException('Please log in to continue');
+    if (!user?.isActive || (user.credentialVersion ?? 0) !== (session.credentialVersion ?? 0)) {
+      throw new UnauthorizedException('Please log in to continue');
+    }
     return publicUser(user);
   }
 

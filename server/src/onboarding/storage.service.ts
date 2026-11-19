@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { MAX_DOCUMENT_BYTES, UploadedDocument } from './document-types';
 
@@ -29,15 +29,16 @@ export class StorageService {
 
   async save(file: UploadedDocument): Promise<{ storageKey: string; mimeType: string }> {
     const format = validateDocument(file);
-    await mkdir(this.directory, { recursive: true });
+    await mkdir(this.directory, { recursive: true, mode: 0o700 });
     const storageKey = `${randomUUID()}.${format.extension}`;
-    await writeFile(this.filePath(storageKey), file.buffer, { flag: 'wx' });
+    await writeFile(this.filePath(storageKey), file.buffer, { flag: 'wx', mode: 0o600 });
     return { storageKey, mimeType: format.mimeType };
   }
 
-  async read(storageKey: string): Promise<Buffer> {
+  async stream(storageKey: string) {
     try {
-      return await readFile(this.filePath(storageKey));
+      const file = await open(this.filePath(storageKey), 'r');
+      return file.createReadStream();
     } catch (error: unknown) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
         throw new NotFoundException('Stored document not found');
