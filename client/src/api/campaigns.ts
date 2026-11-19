@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { Campaign, CampaignInput, CampaignQueueItem, CampaignReview, CampaignStatus, PublishedCampaign } from "./types";
+import type { Campaign, CampaignInput, CampaignQueueItem, CampaignReview, CampaignStatus, PublishedCampaign, PublishedCampaignDetail } from "./types";
 
 export const createCampaign = (input: CampaignInput) =>
   apiRequest<Campaign>("/campaigns", { method: "POST", body: input });
@@ -27,3 +27,6 @@ export const decideCampaign = (id: string, input: Pick<CampaignReview, "decision
 
 export const listPublishedCampaigns = (signal?: AbortSignal) =>
   apiRequest<PublishedCampaign[]>("/marketplace/campaigns", { signal });
+
+export const getPublishedCampaign = (id: string, signal?: AbortSignal) =>
+  apiRequest<PublishedCampaignDetail>(`/marketplace/campaigns/${encodeURIComponent(id)}`, { signal });

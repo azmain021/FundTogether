@@ -8,6 +8,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BusinessesModule } from '../businesses/businesses.module';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
+import { CampaignLifecycleService } from './campaign-lifecycle.service';
 import { CampaignReviewService } from './campaign-review.service';
 import { CampaignReviewDelivery } from './campaign-review-delivery.service';
 import { AdminCampaignsController } from './admin-campaigns.controller';
@@ -21,6 +22,7 @@ import { MarketplaceCampaignsController } from './marketplace-campaigns.controll
     FeatureModelsModule,
   ],
   controllers: [CampaignsController, AdminCampaignsController, MarketplaceCampaignsController],
-  providers: [CampaignsService, CampaignReviewService, CampaignReviewDelivery, AuditWriter, NotificationWriter],
+  providers: [CampaignsService, CampaignLifecycleService, CampaignReviewService, CampaignReviewDelivery, AuditWriter, NotificationWriter],
+  exports: [CampaignLifecycleService],
 })
 export class CampaignsModule {}

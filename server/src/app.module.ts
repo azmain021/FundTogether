@@ -10,6 +10,9 @@ import { UsersModule } from './users/users.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { FeatureModelsModule } from './database/feature-models.module';
+import { WalletsModule } from './wallets/wallets.module';
+import { InvestmentsModule } from './investments/investments.module';
+
 
 @Module({
   imports: [
@@ -30,6 +33,8 @@ import { FeatureModelsModule } from './database/feature-models.module';
     CampaignsModule,
     OnboardingModule,
     FeatureModelsModule,
+    WalletsModule,
+    InvestmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

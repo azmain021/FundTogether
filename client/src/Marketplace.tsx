@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { listPublishedCampaigns } from "./api/campaigns";
 import type { PublishedCampaign } from "./api/types";
@@ -210,6 +211,9 @@ function CampaignCard({ campaign }: { campaign: ReturnType<typeof displayCampaig
             <p className="text-[10px] font-medium text-[#829AB1]">Simulated unit price</p>
             <p className="mt-0.5 text-sm font-bold text-[#102A43]">{campaign.unit}</p>
           </div>
+          <Link to={`/campaigns/${campaign.id}`} className="rounded-xl bg-[#ECFDF5] px-3 py-2 text-sm font-bold text-[#047857] hover:bg-[#D1FAE5]">
+            View campaign
+          </Link>
         </div>
       </div>
     </article>

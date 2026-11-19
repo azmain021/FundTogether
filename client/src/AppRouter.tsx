@@ -9,6 +9,8 @@ const Login = React.lazy(() => import("./Login"));
 const AccountTypeSelection = React.lazy(() => import("./AccountTypeSelection"));
 const PasswordRecovery = React.lazy(() => import("./PasswordRecovery"));
 const AccountHome = React.lazy(() => import("./auth/AccountHome"));
+const WalletLedgerPage = React.lazy(() => import("./wallet/WalletLedgerPage"));
+const PublishedCampaignPage = React.lazy(() => import("./campaigns/PublishedCampaignPage"));
 const AccountSecurity = React.lazy(() => import("./auth/AccountSecurity"));
 const BusinessRegistration = React.lazy(() => import("./BusinessRegistration"));
 const BusinessProfileSetup = React.lazy(() => import("./BusinessProfileSetup"));
@@ -21,7 +23,7 @@ const AdminCampaignReview = React.lazy(() => import("./campaigns/AdminCampaignRe
 const appPaths = new Set([
   "/", "/marketplace", "/login", "/register", "/forgot-password", "/reset-password",
   "/campaigns/shobuj-bazar", "/business/register", "/investor/register",
-  "/business/profile", "/business/documents", "/business/review-status", "/business/campaigns", "/investor", "/admin", "/admin/campaigns", "/account/security",
+  "/business/profile", "/business/documents", "/business/review-status", "/business/campaigns", "/investor", "/investor/wallet", "/admin", "/admin/campaigns", "/account/security",
 ]);
 
 export default function AppRouter() {
@@ -71,6 +73,7 @@ export default function AppRouter() {
       <Route path="/reset-password" element={<PasswordRecovery />} />
       <Route path="/account/security" element={<SessionGate><AccountSecurity /></SessionGate>} />
       <Route path="/campaigns/shobuj-bazar" element={<SessionGate><CampaignDetails /></SessionGate>} />
+      <Route path="/campaigns/:id" element={<PublishedCampaignPage />} />
       <Route path="/business/register" element={<BusinessRegistration key="owner" />} />
       <Route path="/investor/register" element={<BusinessRegistration key="investor" investor />} />
       <Route path="/business/profile" element={<SessionGate roles={["business_owner"]}><BusinessProfileSetup /></SessionGate>} />
@@ -80,6 +83,7 @@ export default function AppRouter() {
       <Route path="/business/campaigns/new" element={<SessionGate roles={["business_owner"]}><CampaignDraftPage /></SessionGate>} />
       <Route path="/business/campaigns/:id" element={<SessionGate roles={["business_owner"]}><CampaignDraftPage /></SessionGate>} />
       <Route path="/investor" element={<SessionGate roles={["investor"]}><AccountHome role="investor" /></SessionGate>} />
+      <Route path="/investor/wallet" element={<SessionGate roles={["investor"]}><WalletLedgerPage /></SessionGate>} />
       <Route path="/admin" element={<SessionGate roles={["admin"]}><AccountHome role="admin" /></SessionGate>} />
       <Route path="/admin/campaigns" element={<SessionGate roles={["admin"]}><AdminCampaignReview /></SessionGate>} />
       <Route path="/admin/campaigns/:id" element={<SessionGate roles={["admin"]}><AdminCampaignReview /></SessionGate>} />
