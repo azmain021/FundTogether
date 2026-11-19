@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { getMyBusiness } from '../api/businesses';
-import { createCampaign, deleteCampaign, getCampaign, updateCampaign } from '../api/campaigns';
+import { createCampaign, deleteCampaign, getCampaign, submitCampaign, updateCampaign } from '../api/campaigns';
 import type { Business, Campaign, CampaignInput } from '../api/types';
 import OnboardingLayout from '../onboarding/OnboardingLayout';
 import { campaignErrorMessage, campaignStatusLabels, isDraftEditable } from './campaign-display';
@@ -48,6 +48,9 @@ function CampaignForm({ business, initialCampaign }: { business: Business | null
   const canArchive = !!campaign && isDraftEditable(campaign.status);
   const canEdit = business?.verificationStatus === 'approved' &&
     (!campaign || (canArchive && campaign.businessId === business._id));
+  const canSubmit = canEdit && campaign?.status === 'draft';
+  const savedFields = draftValues(campaign);
+  const hasChanges = (Object.keys(values) as (keyof DraftFields)[]).some(key => values[key] !== savedFields[key]);
   const target = Number(values.fundingTarget);
   const price = Number(values.unitPrice);
   const validAmounts = Number.isSafeInteger(target) && Number.isSafeInteger(price) && target > 0 && price > 0;
@@ -90,7 +93,7 @@ function CampaignForm({ business, initialCampaign }: { business: Business | null
           return;
         }
         const saved = await updateCampaign(campaign._id, changes);
-        setCampaign(saved);
+        setCampaign({ ...saved, latestReview: campaign.latestReview });
         setValues(draftValues(saved));
         setSuccess('Campaign draft saved.');
       } else {
@@ -120,6 +123,22 @@ function CampaignForm({ business, initialCampaign }: { business: Business | null
     }
   }
 
+  async function submit() {
+    if (!campaign || !canSubmit || hasChanges || busy || confirmArchive) return;
+    setBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const submitted = await submitCampaign(campaign._id);
+      setCampaign({ ...submitted, latestReview: campaign.latestReview });
+      setSuccess('Campaign submitted for review.');
+    } catch (cause) {
+      setError(campaignErrorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="rounded-3xl border border-[#DCE5EB] bg-white p-5 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -128,6 +147,10 @@ function CampaignForm({ business, initialCampaign }: { business: Business | null
           {campaign ? campaignStatusLabels[campaign.status] : 'Draft'}
         </span>
       </div>
+      {campaign?.latestReview?.decision === 'rejected' && <section className="mt-5 rounded-xl border border-[#F3C7C7] bg-[#FFF5F5] p-4 text-sm text-[#7F1D1D]">
+        <h2 className="font-bold">Review feedback for version {campaign.latestReview.version}</h2>
+        <p className="mt-2 whitespace-pre-wrap break-words">{campaign.latestReview.feedback}</p>
+      </section>}
       {!canEdit && <p className="mt-5 rounded-xl bg-[#F1F5F9] p-4 text-sm leading-6 text-[#334E68]">
         {campaign && !canArchive
           ? 'This campaign is read-only in its current status.'
@@ -166,7 +189,11 @@ function CampaignForm({ business, initialCampaign }: { business: Business | null
           {canArchive && !confirmArchive && <button type="button" disabled={busy} onClick={() => { setConfirmArchive(true); setSuccess(''); }} className="rounded-xl border border-[#CBD5E1] px-5 py-3 text-sm font-bold text-[#334E68] hover:bg-[#F1F5F9]">
             Archive campaign
           </button>}
+          {canSubmit && !confirmArchive && <button type="button" disabled={busy || hasChanges} onClick={() => void submit()} className="rounded-xl bg-[#102A43] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">
+            Submit for review
+          </button>}
         </div>}
+        {canSubmit && hasChanges && <p className="mt-3 text-sm text-[#526B82]">Save your changes before submitting.</p>}
         {confirmArchive && <div className="mt-4 rounded-xl border border-[#F3C7C7] bg-[#FFF5F5] p-4">
           <p className="text-sm text-[#7F1D1D]">Archive this campaign? It will leave My Campaigns and any review history will be kept.</p>
           <div className="mt-3 flex flex-wrap gap-3">

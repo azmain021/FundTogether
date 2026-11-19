@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import type { CurrentAccount } from '../auth/current-user.decorator';
 import { BusinessesService } from '../businesses/businesses.service';
 import { CampaignStatus, UserRole } from '../common/enums';
@@ -67,15 +67,26 @@ export class CampaignsService {
     }).sort({ createdAt: -1, _id: -1 }).exec();
   }
 
-  async findForUser(id: Types.ObjectId, user: CurrentAccount): Promise<CampaignDocument> {
-    const campaign = await this.campaignModel.findOne({ _id: id, deletedAt: null }).exec();
+  listPublished() {
+    return this.campaignModel.find({
+      status: { $in: [CampaignStatus.Active, CampaignStatus.Funded] }, deletedAt: null,
+    }).select(
+      'title fundingTarget unitPrice totalUnits remainingUnits status startsAt endsAt ' +
+      'businessSnapshot.name businessSnapshot.sector businessSnapshot.division businessSnapshot.district',
+    ).sort({ startsAt: -1, _id: -1 }).lean().exec();
+  }
+
+  async findForUser(id: Types.ObjectId, user: CurrentAccount, session?: ClientSession): Promise<CampaignDocument> {
+    const query = this.campaignModel.findOne({ _id: id, deletedAt: null });
+    if (session) query.session(session);
+    const campaign = await query.exec();
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
     if (user.role === UserRole.Admin) return campaign;
     if (user.role !== UserRole.BusinessOwner) throw new ForbiddenException('Your account cannot access this campaign');
     if (!campaign.ownerId) {
-      await this.businessesService.findForUser(campaign.businessId, user);
+      await this.businessesService.findForUser(campaign.businessId, user, session);
     } else if (campaign.ownerId.toString() !== user.id) {
       throw new ForbiddenException('You cannot access another owner’s campaign');
     }

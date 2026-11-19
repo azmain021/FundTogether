@@ -54,9 +54,11 @@ saves to and reloads from the API. A campaign can only be created for a business
 whose `verificationStatus` is `approved`. The demo seed provisions an approved
 example business while the admin review flow is pending. Business owners and
 investors can register, and all three roles can log in and reset their
-passwords. The owner document upload flow is wired. Review and approval
-screens are pending. See [Authentication](docs/Authentication.md) for
-sign-in and instant password recovery using a saved code.
+passwords. The owner document upload flow is wired. Owners can submit campaign
+drafts, administrators can approve or reject them, and published campaigns appear
+on the marketplace. The full business verification review flow is pending.
+See [Authentication](docs/Authentication.md) for sign-in and instant password
+recovery using a saved code.
 
 ## MongoDB Atlas
 

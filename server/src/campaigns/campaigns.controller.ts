@@ -8,6 +8,7 @@ import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { UserRole } from '../common/enums';
 import { CampaignsService } from './campaigns.service';
+import { CampaignReviewService } from './campaign-review.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { ListCampaignsDto } from './dto/list-campaigns.dto';
@@ -15,7 +16,7 @@ import { ListCampaignsDto } from './dto/list-campaigns.dto';
 @Controller('campaigns')
 @UseGuards(SessionGuard)
 export class CampaignsController {
-  constructor(private readonly campaignsService: CampaignsService) {}
+  constructor(private readonly campaignsService: CampaignsService, private readonly reviews: CampaignReviewService) {}
 
   @Post()
   @Roles(UserRole.BusinessOwner)
@@ -33,7 +34,15 @@ export class CampaignsController {
   @Get(':id')
   @Roles(UserRole.BusinessOwner, UserRole.Admin)
   findOne(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @CurrentUser() user: CurrentAccount) {
-    return this.campaignsService.findForUser(id, user);
+    return this.reviews.detail(id, user);
+  }
+
+  @Post(':id/submit')
+  @HttpCode(200)
+  @Roles(UserRole.BusinessOwner)
+  @UseGuards(SessionOriginGuard)
+  submit(@Param('id', ParseObjectIdPipe) id: Types.ObjectId, @CurrentUser() user: CurrentAccount) {
+    return this.reviews.submit(id, user);
   }
 
   @Patch(':id')

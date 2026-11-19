@@ -80,6 +80,26 @@ export type Campaign = CampaignInput & {
   version: number;
   startsAt?: string;
   endsAt?: string;
+  submittedAt?: string;
+  latestReview?: CampaignReview | null;
+  submittedSnapshot?: (CampaignInput & { totalUnits: number; remainingUnits: number }) | null;
+  businessVerificationStatus?: VerificationStatus;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CampaignReview = {
+  decision: 'approved' | 'rejected';
+  version: number;
+  feedback?: string;
+  reviewedAt?: string;
+};
+
+export type CampaignQueueItem = Pick<Campaign, '_id' | 'title' | 'version' | 'submittedAt' | 'fundingTarget' | 'unitPrice' | 'totalUnits'> & {
+  businessId: { officialName: string } | null;
+};
+
+export type PublishedCampaign = Pick<Campaign, '_id' | 'title' | 'fundingTarget' | 'unitPrice' | 'totalUnits' | 'remainingUnits' | 'startsAt' | 'endsAt'> & {
+  status: 'active' | 'funded';
+  businessSnapshot?: { name: string; sector: BusinessSector; division: string; district: string };
 };

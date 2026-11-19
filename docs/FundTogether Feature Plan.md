@@ -100,9 +100,9 @@ Phase 0 delivers shared infrastructure and the complete MongoDB schema for all 2
 | `documents` | F2, F4 | `businessId`, `ownerId`, `type`, `storageKey`, `originalName`, `mimeType`, `sizeBytes`, `status`, `replacesDocumentId?` | `(businessId, type, createdAt)` |
 | `business_applications` | F3, F5 | `businessId`, `ownerId`, `round`, `status`, `checklist`, `submittedAt`, `decision?`, `decisionReason?`, `decidedBy?`, `decidedAt?` | `(status, submittedAt)`, `businessId` |
 | `document_reviews` | F4 | `documentId`, `applicationId`, `reviewerId`, `decision`, `note` | `documentId`, `applicationId` |
-| `campaigns` | F6, F7, F9 | `businessId`, `ownerId`, `title`, `description`, `purpose`, `useOfFunds`, `fundingTarget`, `unitPrice`, `totalUnits`, `remainingUnits`, `durationDays`, `startsAt?`, `endsAt?`, `status`, `version`, `firstInvestmentAt?`, `businessSnapshot` | `(status, createdAt)`, `ownerId`, `businessId`, text(`title`, `description`, `businessSnapshot.name`) |
-| `campaign_reviews` | F7 | `campaignId`, `version`, `reviewerId`, `decision`, `feedback` | `campaignId` |
-| `campaign_revisions` | F8 | `campaignId`, `version`, `snapshot`, `submittedAt`, `changedFields` | unique `(campaignId, version)` |
+| `campaigns` | F6, F7, F9 | `businessId`, `ownerId`, `title`, `description`, `purpose`, `useOfFunds`, `fundingTarget`, `unitPrice`, `totalUnits`, `remainingUnits`, `durationDays`, `submittedAt?`, `startsAt?`, `endsAt?`, `status`, `version`, `firstInvestmentAt?`, `businessSnapshot` | `(status, createdAt)`, `(status, submittedAt, _id)`, `ownerId`, `businessId`, text(`title`, `description`, `businessSnapshot.name`) |
+| `campaign_reviews` | F7 | `campaignId`, `version`, `reviewerId`, `decision`, `feedback?`, `notificationPending` | `(campaignId, version)`, partial retry index |
+| `campaign_revisions` | F7, F8 | `campaignId`, `version`, `snapshot`, `submittedAt`, `changedFields` | unique `(campaignId, version)` |
 | `analytics_reports` | F10 | `ownerId`, `businessId`, `campaignId?`, `periodFrom`, `periodTo`, `metrics`, `metricsHash`, `insights`, `model`, `promptVersion`, `status`, `generatedAt` | `(businessId, generatedAt)` |
 | `watchlists` | F13 | `investorId`, `campaignId` | unique `(investorId, campaignId)` |
 | `wallets` | F16 | `userId`, `balance` | unique `userId` |
@@ -317,10 +317,12 @@ Owners submit campaigns, and admins approve them for publication or reject them 
   |---|---|---|
   | `POST /campaigns/:id/submit` | owner | `draft` → `pending_review` |
   | `GET /admin/campaigns?status=pending_review` | admin | Review queue |
-  | `PATCH /admin/campaigns/:id/review` | admin | `{ decision, feedback }` |
+  | `GET /campaigns/:id` | owner / admin | Latest feedback and, for pending admin reviews, the submitted snapshot |
+  | `PATCH /admin/campaigns/:id/review` | admin | `{ version, decision, feedback? }` |
+  | `GET /marketplace/campaigns` | public | Active and funded campaigns using public fields |
 - **Backend logic:**
   - Submit re-checks completeness and business approval.
-  - Approval re-checks that the business is still `approved`. It then sets `approved` → `active` with `startsAt = now` and `endsAt = now + durationDays`.
+  - Approval re-checks that the business is still `approved` and moves the campaign to `active` with `startsAt = now` and `endsAt = now + durationDays`.
   - Approval also copies the public business fields (name, sector, division, district) into `businessSnapshot` for marketplace search.
   - Rejection requires `feedback`.
   - Both paths insert `campaign_reviews` with the reviewed `version`, write an audit event and notify the owner.
@@ -343,7 +345,7 @@ Rejected campaigns can be revised and resubmitted without losing earlier version
   | `GET /campaigns/:id/revisions/:version` | owner / admin | Snapshot |
   | `GET /admin/campaigns/:id/diff` | admin | Changed fields since the last reviewed version |
 - **Backend logic:**
-  - On every submit (F7), insert `campaign_revisions { version, snapshot, changedFields }`, then increment `campaigns.version`.
+  - On every submit (F7), set `campaigns.version` to the submitted round and insert the matching `campaign_revisions { version, snapshot, changedFields }`.
   - Editing a `rejected` campaign returns it to `draft`.
   - Resubmitting uses the same submit route, so the round number is the `version`.
   - Snapshots are immutable and have no update route.

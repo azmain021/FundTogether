@@ -10,5 +10,5 @@ export interface NotificationsService {
     link: string;
     entityType: string;
     entityId: Types.ObjectId;
-  }): Promise<void>;
+  }, notificationId?: Types.ObjectId): Promise<void>;
 }
