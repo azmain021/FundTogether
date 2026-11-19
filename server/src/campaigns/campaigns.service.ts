@@ -1,12 +1,13 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model, Types } from 'mongoose';
+import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
 import type { CurrentAccount } from '../auth/current-user.decorator';
 import { BusinessesService } from '../businesses/businesses.service';
 import { CampaignStatus, UserRole } from '../common/enums';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
+import { ListMarketplaceCampaignsDto } from './dto/list-marketplace-campaigns.dto';
 import { Campaign, CampaignDocument } from './schemas/campaign.schema';
 
 const MAX_TOTAL_UNITS = 100_000; // D-05
@@ -67,13 +68,118 @@ export class CampaignsService {
     }).sort({ createdAt: -1, _id: -1 }).exec();
   }
 
-  listPublished() {
-    return this.campaignModel.find({
-      status: { $in: [CampaignStatus.Active, CampaignStatus.Funded] }, deletedAt: null,
-    }).select(
-      'title fundingTarget unitPrice totalUnits remainingUnits status startsAt endsAt ' +
-      'businessSnapshot.name businessSnapshot.sector businessSnapshot.division businessSnapshot.district',
-    ).sort({ startsAt: -1, _id: -1 }).lean().exec();
+  async listPublished(query: ListMarketplaceCampaignsDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 12;
+
+    if (
+      query.minTarget !== undefined &&
+      query.maxTarget !== undefined &&
+      query.minTarget > query.maxTarget
+    ) {
+      throw new BadRequestException('minTarget cannot be greater than maxTarget');
+    }
+
+    const match: Record<string, unknown> = {
+      status: {
+        $in: query.status
+          ? [query.status]
+          : [CampaignStatus.Active, CampaignStatus.Funded],
+      },
+      deletedAt: null,
+    };
+
+    const search = query.q?.trim();
+    if (search) {
+      match.$text = { $search: search };
+    }
+
+    if (query.sector) {
+      match['businessSnapshot.sector'] = query.sector;
+    }
+
+    if (query.division?.trim()) {
+      match['businessSnapshot.division'] = query.division.trim();
+    }
+
+    if (query.district?.trim()) {
+      match['businessSnapshot.district'] = query.district.trim();
+    }
+
+    if (query.minTarget !== undefined || query.maxTarget !== undefined) {
+      match.fundingTarget = {
+        ...(query.minTarget !== undefined ? { $gte: query.minTarget } : {}),
+        ...(query.maxTarget !== undefined ? { $lte: query.maxTarget } : {}),
+      };
+    }
+
+    const sort: Record<string, 1 | -1> =
+      query.sort === 'ending_soon'
+        ? { endsAt: 1, _id: -1 }
+        : query.sort === 'least_remaining'
+          ? { remainingUnits: 1, _id: -1 }
+          : query.sort === 'most_funded'
+            ? { fundingProgress: -1, _id: -1 }
+            : { startsAt: -1, _id: -1 };
+
+    const pipeline: PipelineStage[] = [
+      { $match: match as never },
+      ...(query.sort === 'most_funded'
+        ? [{
+            $set: {
+              fundingProgress: {
+                $cond: [
+                  { $gt: ['$totalUnits', 0] },
+                  {
+                    $divide: [
+                      { $subtract: ['$totalUnits', '$remainingUnits'] },
+                      '$totalUnits',
+                    ],
+                  },
+                  0,
+                ],
+              },
+            },
+          }] as PipelineStage[]
+        : []),
+      { $sort: sort },
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          items: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
+            {
+              $project: {
+                title: 1,
+                fundingTarget: 1,
+                unitPrice: 1,
+                totalUnits: 1,
+                remainingUnits: 1,
+                status: 1,
+                startsAt: 1,
+                endsAt: 1,
+                'businessSnapshot.name': 1,
+                'businessSnapshot.sector': 1,
+                'businessSnapshot.division': 1,
+                'businessSnapshot.district': 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const [result] = await this.campaignModel.aggregate<{
+      metadata: Array<{ total: number }>;
+      items: unknown[];
+    }>(pipeline).exec();
+
+    return {
+      items: result?.items ?? [],
+      page,
+      total: result?.metadata[0]?.total ?? 0,
+    };
   }
 
   async findPublished(id: Types.ObjectId) {
