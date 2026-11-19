@@ -14,7 +14,10 @@ export default function AccountHome({ role }: { role: 'admin' | 'investor' }) {
       <main className="page-container py-12">
         <h1 className="text-3xl font-bold">{role === 'admin' ? 'Administrator account' : 'Investor account'}</h1>
         <p className="mt-3 text-sm text-[#526B82]">Signed in as {user?.displayName} ({user?.email}).</p>
-        <a href="/marketplace" className="mt-6 inline-block rounded-xl bg-[#059669] px-5 py-3 text-sm font-bold text-white hover:bg-[#047857]">Browse campaigns</a>
+        <div className="mt-6 flex flex-wrap gap-3">
+          {role === 'admin' && <a href="/admin/campaigns" className="rounded-xl bg-[#047857] px-5 py-3 text-sm font-bold text-white hover:bg-[#065F46]">Campaign review</a>}
+          <a href="/marketplace" className="rounded-xl border border-[#CBD5E1] bg-white px-5 py-3 text-sm font-bold text-[#047857]">Browse campaigns</a>
+        </div>
       </main>
     </div>
   );

@@ -1,4 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { listPublishedCampaigns } from "./api/campaigns";
+import type { PublishedCampaign } from "./api/types";
 import AccountLinks from "./auth/AccountLinks";
 
 type IconProps = { className?: string };
@@ -27,19 +29,6 @@ const ChevronDown = ({ className = "h-4 w-4" }: IconProps) => (
     aria-hidden="true"
   >
     <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
-  </svg>
-);
-
-const ArrowRight = ({ className = "h-4 w-4" }: IconProps) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-5-5 5 5-5 5" />
   </svg>
 );
 
@@ -105,98 +94,26 @@ const Close = ({ className = "h-6 w-6" }: IconProps) => (
   </svg>
 );
 
-const campaigns = [
-  {
-    name: "Shobuj Bazar",
-    category: "Grocery",
-    location: "Dhaka",
-    target: 5000000,
-    raised: 3420000,
-    targetLabel: "৳50,00,000",
-    raisedLabel: "৳34,20,000",
-    unit: "৳500",
-    progress: 68,
-    status: "Building momentum",
-    added: 6,
-    image:
-      "https://images.unsplash.com/photo-1667312942298-4f4724f3a5d3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw5fHxCYW5nbGFkZXNoJTIwc21hbGwlMjBidXNpbmVzcyUyMG1hcmtldCUyMGNsb3RoaW5nJTIwcG91bHRyeSUyMHNvbGFyJTIwYmFrZXJ5JTIwcmVzdGF1cmFudHxlbnwxfHx8fDE3OTQ2NTg0NzN8MA&ixlib=rb-4.1.0&q=80&w=1080",
-  },
-  {
-    name: "Nodi Bangla Kitchen",
-    category: "Restaurant",
-    location: "Chattogram",
-    target: 4800000,
-    raised: 2500000,
-    targetLabel: "৳48,00,000",
-    raisedLabel: "৳25,00,000",
-    unit: "৳1,000",
-    progress: 52,
-    status: "Building momentum",
-    added: 5,
-    image:
-      "https://images.unsplash.com/photo-1692826090383-b793a5e4e81c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxCYW5nbGFkZXNoJTIwcmVzdGF1cmFudCUyMHNtYWxsJTIwYnVzaW5lc3MlMjBEaGFrYSUyMGludGVyaW9yJTIwb3duZXJ8ZW58MXx8fHwxNzk0NjU2Nzk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
-  },
-  {
-    name: "Sylhet Oven",
-    category: "Bakery",
-    location: "Sylhet",
-    target: 2250000,
-    raised: 1460000,
-    targetLabel: "৳22,50,000",
-    raisedLabel: "৳14,60,000",
-    unit: "৳500",
-    progress: 65,
-    status: "Building momentum",
-    added: 4,
-    image:
-      "https://images.unsplash.com/photo-1568254183919-78a4f43a2877?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzbWFsbCUyMGJ1c2luZXNzJTIwb3duZXJzJTIwc2hvcCUyMHJlc3RhdXJhbnQlMjBiYWtlcnklMjByZW5ld2FibGUlMjBlbmVyZ3klMjBzb2xhciUyMHByb2Zlc3Npb25hbHxlbnwxfHx8fDE3OTQ2NTYzODN8MA&ixlib=rb-4.1.0&q=80&w=1080",
-  },
-  {
-    name: "Deshi Threads",
-    category: "Clothing",
-    location: "Dhaka",
-    target: 6000000,
-    raised: 2760000,
-    targetLabel: "৳60,00,000",
-    raisedLabel: "৳27,60,000",
-    unit: "৳1,000",
-    progress: 46,
-    status: "Early progress",
-    added: 3,
-    image:
-      "https://images.unsplash.com/photo-1573612664822-d7d347da7b80?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXN0YWluYWJsZSUyMGNsb3RoaW5nJTIwZmFzaGlvbiUyMHN0dWRpbyUyMHNtYWxsJTIwYnVzaW5lc3N8ZW58MXx8fHwxNzk0NjU2Mzg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
-  },
-  {
-    name: "Green Acre Poultry",
-    category: "Agriculture",
-    location: "Gazipur",
-    target: 3000000,
-    raised: 2280000,
-    targetLabel: "৳30,00,000",
-    raisedLabel: "৳22,80,000",
-    unit: "৳500",
-    progress: 76,
-    status: "Near target",
-    added: 2,
-    image:
-      "https://images.unsplash.com/photo-1715034076526-79a3241d046d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcmVlJTIwcmFuZ2UlMjBwb3VsdHJ5JTIwZmFybSUyMGNoaWNrZW5zfGVufDF8fHx8MTc5NDY1NjM4OXww&ixlib=rb-4.1.0&q=80&w=1080",
-  },
-  {
-    name: "Solar Horizon",
-    category: "Renewable Energy",
-    location: "Rajshahi",
-    target: 9000000,
-    raised: 7290000,
-    targetLabel: "৳90,00,000",
-    raisedLabel: "৳72,90,000",
-    unit: "৳2,000",
-    progress: 81,
-    status: "Near target",
-    added: 1,
-    image:
-      "https://images.unsplash.com/photo-1509391366360-2e959784a276?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzb2xhciUyMGVuZXJneSUyMGZhcm0lMjBwYW5lbHMlMjBidXNpbmVzc3xlbnwxfHx8fDE3OTQ2NTYzODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
-  },
-];
+const taka = new Intl.NumberFormat("en-BD");
+
+function displayCampaign(campaign: PublishedCampaign) {
+  const business = campaign.businessSnapshot;
+  const unitsFunded = Math.max(0, campaign.totalUnits - campaign.remainingUnits);
+  return {
+    id: campaign._id,
+    name: campaign.title,
+    businessName: business?.name ?? "",
+    category: business?.sector.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) ?? "Uncategorized",
+    location: business?.district || business?.division || "",
+    target: campaign.fundingTarget,
+    targetLabel: `৳${taka.format(campaign.fundingTarget)}`,
+    raisedLabel: `৳${taka.format(unitsFunded * campaign.unitPrice)}`,
+    unit: `৳${taka.format(campaign.unitPrice)}`,
+    progress: campaign.totalUnits > 0 ? Math.min(100, Math.round(unitsFunded / campaign.totalUnits * 100)) : 0,
+    status: campaign.status === "funded" ? "Funded" : "Active",
+    added: campaign.startsAt ? Date.parse(campaign.startsAt) : 0,
+  };
+}
 
 function Logo({ inverse = false }: { inverse?: boolean }) {
   return (
@@ -244,41 +161,21 @@ function SelectControl({
   );
 }
 
-function CampaignCard({ campaign }: { campaign: (typeof campaigns)[number] }) {
+function CampaignCard({ campaign }: { campaign: ReturnType<typeof displayCampaign> }) {
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-[20px] border border-[#E3EAF0] bg-white shadow-[0_6px_24px_rgba(16,42,67,.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(16,42,67,.11)]">
-      <div className="relative h-48 shrink-0 overflow-hidden sm:h-52">
-        <img
-          src={campaign.image}
-          alt={`${campaign.name}, an illustrative ${campaign.category.toLowerCase()} campaign`}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-        />
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#102A43]/40 to-transparent" />
-        <span className="absolute left-4 top-4 rounded-full border border-white/30 bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-[#102A43] shadow-sm">
-          {campaign.category}
-        </span>
-        <span className="absolute right-4 top-4 rounded-full bg-[#102A43]/85 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur">
-          Illustrative
-        </span>
-      </div>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <div className="flex min-h-[58px] items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-[19px] font-bold tracking-[-0.025em] text-[#102A43]">
-              {campaign.name}
-            </h2>
-            <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-[#627D98]">
-              <MapPin className="h-3.5 w-3.5 text-[#829AB1]" /> {campaign.location}, Bangladesh
-            </p>
-          </div>
-          <span className="shrink-0 rounded-md bg-[#ECFDF5] px-2 py-1 text-[10px] font-bold text-[#047857]">
-            {campaign.progress}%
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="rounded-full bg-[#EDF2F7] px-3 py-1.5 text-xs font-semibold">{campaign.category}</span>
+          <span className="rounded-full bg-[#ECFDF5] px-3 py-1.5 text-xs font-bold text-[#047857]">{campaign.status}</span>
         </div>
-
-        <div className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-[#CDEEE1] bg-[#F0FDF8] px-2.5 py-1.5 text-[10px] font-semibold text-[#047857]">
-          <ShieldCheck className="h-3.5 w-3.5" /> Documents reviewed
-        </div>
+        <h2 className="mt-4 break-words text-[19px] font-bold tracking-[-0.025em]">{campaign.name}</h2>
+        {campaign.businessName && <p className="mt-1 text-sm text-[#526B82]">{campaign.businessName}</p>}
+        {campaign.location && (
+          <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-[#627D98]">
+            <MapPin className="h-3.5 w-3.5 text-[#829AB1]" /> {campaign.location}, Bangladesh
+          </p>
+        )}
 
         <div className="mt-5 grid grid-cols-2 gap-4 border-y border-[#E8EEF2] py-4">
           <div>
@@ -297,7 +194,7 @@ function CampaignCard({ campaign }: { campaign: (typeof campaigns)[number] }) {
 
         <div className="mt-5">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="font-medium text-[#627D98]">Illustrative funding progress</span>
+            <span className="font-medium text-[#627D98]">Simulated funding progress</span>
             <span className="font-bold text-[#059669]">{campaign.progress}%</span>
           </div>
           <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-[#E7EDF2]">
@@ -313,12 +210,6 @@ function CampaignCard({ campaign }: { campaign: (typeof campaigns)[number] }) {
             <p className="text-[10px] font-medium text-[#829AB1]">Simulated unit price</p>
             <p className="mt-0.5 text-sm font-bold text-[#102A43]">{campaign.unit}</p>
           </div>
-          {campaign.name === "Shobuj Bazar" ? <a
-            href="/campaigns/shobuj-bazar"
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#102A43] px-4 text-xs font-bold text-white transition-colors hover:bg-[#183B56]"
-          >
-            View Details <ArrowRight />
-          </a> : <span className="text-xs font-semibold text-[#829AB1]">Details coming soon</span>}
         </div>
       </div>
     </article>
@@ -333,10 +224,25 @@ export default function Marketplace() {
   const [status, setStatus] = useState("All statuses");
   const [sort, setSort] = useState("Newest");
 
+  const [feed, setFeed] = useState<{ attempt: number; campaigns?: PublishedCampaign[]; failed?: boolean }>();
+  const [attempt, setAttempt] = useState(0);
+  const currentFeed = feed?.attempt === attempt ? feed : undefined;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    listPublishedCampaigns(controller.signal).then(
+      (campaigns) => { if (!controller.signal.aborted) setFeed({ attempt, campaigns }); },
+      () => { if (!controller.signal.aborted) setFeed({ attempt, failed: true }); },
+    );
+    return () => controller.abort();
+  }, [attempt]);
+
+  const campaigns = useMemo(() => (currentFeed?.campaigns ?? []).map(displayCampaign), [currentFeed]);
+
   const filteredCampaigns = useMemo(() => {
     const query = search.trim().toLowerCase();
     const results = campaigns.filter((campaign) => {
-      const matchesSearch = !query || campaign.name.toLowerCase().includes(query);
+      const matchesSearch = campaign.name.toLowerCase().includes(query) || campaign.businessName.toLowerCase().includes(query);
       const matchesCategory = category === "All categories" || campaign.category === category;
       const matchesLocation = location === "All locations" || campaign.location === location;
       const matchesStatus = status === "All statuses" || campaign.status === status;
@@ -348,7 +254,7 @@ export default function Marketplace() {
       if (sort === "Funding Target") return b.target - a.target;
       return b.added - a.added;
     });
-  }, [category, location, search, sort, status]);
+  }, [campaigns, category, location, search, sort, status]);
 
   const resetFilters = () => {
     setSearch("");
@@ -427,8 +333,7 @@ export default function Marketplace() {
               Discover businesses across Bangladesh and explore their simulated funding campaigns.
             </p>
             <p className="mx-auto mt-2 max-w-[620px] text-[11px] leading-5 text-[#829AB1]">
-              All businesses, documents, funding figures and progress shown are illustrative
-              demonstration data.
+              Funding figures and unit prices are for the simulation.
             </p>
           </div>
         </section>
@@ -447,7 +352,7 @@ export default function Marketplace() {
                       type="search"
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search business name"
+                      placeholder="Search campaigns or businesses"
                       className="h-12 w-full rounded-xl border border-[#D9E2EC] bg-white pl-11 pr-4 text-sm text-[#243B53] outline-none transition placeholder:text-[#9FB3C8] focus:border-[#059669] focus:ring-4 focus:ring-[#059669]/10"
                     />
                   </span>
@@ -462,7 +367,7 @@ export default function Marketplace() {
                 </SelectControl>
                 <SelectControl label="Location" value={location} onChange={setLocation}>
                   <option>All locations</option>
-                  {Array.from(new Set(campaigns.map((campaign) => campaign.location))).map(
+                  {Array.from(new Set(campaigns.map((campaign) => campaign.location).filter(Boolean))).map(
                     (option) => (
                       <option key={option}>{option}</option>
                     ),
@@ -470,9 +375,8 @@ export default function Marketplace() {
                 </SelectControl>
                 <SelectControl label="Funding status" value={status} onChange={setStatus}>
                   <option>All statuses</option>
-                  <option>Early progress</option>
-                  <option>Building momentum</option>
-                  <option>Near target</option>
+                  <option>Active</option>
+                  <option>Funded</option>
                 </SelectControl>
                 <SelectControl label="Sort by" value={sort} onChange={setSort}>
                   <option>Newest</option>
@@ -482,12 +386,11 @@ export default function Marketplace() {
               </div>
             </div>
             <div className="flex flex-col justify-between gap-3 py-5 sm:flex-row sm:items-center">
-              <div>
-                <p className="text-sm font-bold text-[#102A43]">
+              <div aria-live="polite">
+                {currentFeed?.campaigns && <p className="text-sm font-bold text-[#102A43]">
                   {filteredCampaigns.length}{" "}
                   {filteredCampaigns.length === 1 ? "campaign" : "campaigns"} found
-                </p>
-                <p className="mt-1 text-xs text-[#829AB1]">Illustrative demonstration results</p>
+                </p>}
               </div>
               {(search ||
                 category !== "All categories" ||
@@ -508,10 +411,17 @@ export default function Marketplace() {
 
         <section id="campaigns" className="scroll-mt-24 bg-[#F8FAFC] pb-24">
           <div className="page-container">
-            {filteredCampaigns.length > 0 ? (
+            {!currentFeed ? (
+              <p role="status" className="py-6 text-sm text-[#526B82]">Loading campaigns…</p>
+            ) : currentFeed.failed ? (
+              <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">
+                Campaigns could not be loaded.{' '}
+                <button type="button" onClick={() => setAttempt(value => value + 1)} className="font-bold underline">Try again</button>
+              </p>
+            ) : filteredCampaigns.length > 0 ? (
               <div className="grid auto-rows-fr gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {filteredCampaigns.map((campaign) => (
-                  <CampaignCard key={campaign.name} campaign={campaign} />
+                  <CampaignCard key={campaign.id} campaign={campaign} />
                 ))}
               </div>
             ) : (
@@ -519,45 +429,19 @@ export default function Marketplace() {
                 <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#EDF2F7] text-[#627D98]">
                   <SearchIcon />
                 </span>
-                <h2 className="mt-4 text-lg font-bold text-[#102A43]">No campaigns found</h2>
-                <p className="mt-2 text-sm text-[#627D98]">
-                  Try changing your search or filter selections.
-                </p>
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="mt-5 rounded-lg bg-[#102A43] px-4 py-2.5 text-xs font-bold text-white"
-                >
-                  Reset filters
-                </button>
-              </div>
-            )}
-
-            {filteredCampaigns.length > 0 && (
-              <div className="mt-12 flex flex-col items-center justify-between gap-4 rounded-2xl border border-[#E3EAF0] bg-white px-5 py-4 sm:flex-row">
-                <p className="text-xs font-medium text-[#627D98]">
-                  Showing {filteredCampaigns.length} of {filteredCampaigns.length} illustrative
-                  campaigns
-                </p>
-                <nav className="flex items-center gap-2" aria-label="Marketplace pagination">
-                  <button
-                    type="button"
-                    disabled
-                    className="h-9 rounded-lg border border-[#D9E2EC] px-3 text-xs font-semibold text-[#9FB3C8] disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#102A43] text-xs font-bold text-white">
-                    1
-                  </span>
-                  <button
-                    type="button"
-                    disabled
-                    className="h-9 rounded-lg border border-[#D9E2EC] px-3 text-xs font-semibold text-[#9FB3C8] disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </nav>
+                <h2 className="mt-4 text-lg font-bold text-[#102A43]">{campaigns.length ? "No campaigns found" : "No published campaigns yet"}</h2>
+                {campaigns.length > 0 && (
+                  <>
+                    <p className="mt-2 text-sm text-[#627D98]">Try changing your search or filters.</p>
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="mt-5 rounded-lg bg-[#102A43] px-4 py-2.5 text-xs font-bold text-white"
+                    >
+                      Reset filters
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -601,10 +485,8 @@ export default function Marketplace() {
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#5EE0B5]" />
               <p className="text-[11px] leading-5 text-[#92A9BA]">
                 <strong className="font-semibold text-[#C8D6E0]">Simulation notice:</strong>{" "}
-                Marketplace businesses, reviewed-document labels, BDT amounts and funding progress
-                are illustrative demonstration data. Document review does not represent an
-                endorsement or guarantee. No real investments, money transfers, guaranteed returns
-                or financial transactions are offered.
+                Campaign funding and progress use simulated BDT. No real investments, money
+                transfers, guaranteed returns or financial transactions are offered.
               </p>
             </div>
           </div>

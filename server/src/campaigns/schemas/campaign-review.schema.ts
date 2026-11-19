@@ -25,7 +25,13 @@ export class CampaignReview {
     },
   })
   feedback?: string;
+
+  @Prop({ default: false })
+  notificationPending: boolean;
+
+  createdAt?: Date;
 }
 
 export const CampaignReviewSchema = SchemaFactory.createForClass(CampaignReview);
 CampaignReviewSchema.index({ campaignId: 1, version: 1 });
+CampaignReviewSchema.index({ notificationPending: 1, updatedAt: 1 }, { partialFilterExpression: { notificationPending: true } });

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { UserRole, VerificationStatus } from '../common/enums';
 import type { AuthenticatedRequest } from '../auth/session.guard';
 import { CreateBusinessDto } from './dto/create-business.dto';
@@ -42,16 +42,18 @@ export class BusinessesService {
     return this.businessModel.find(filter).sort({ createdAt: -1 }).exec();
   }
 
-  async findForUser(id: Types.ObjectId, user: AuthenticatedRequest['user']): Promise<BusinessDocument> {
-    const business = await this.findOne(id);
+  async findForUser(id: Types.ObjectId, user: AuthenticatedRequest['user'], session?: ClientSession): Promise<BusinessDocument> {
+    const business = await this.findOne(id, session);
     if (user.role !== UserRole.Admin && business.ownerId?.toString() !== user.id) {
       throw new ForbiddenException('You cannot access another owner’s business');
     }
     return business;
   }
 
-  async findOne(id: Types.ObjectId): Promise<BusinessDocument> {
-    const business = await this.businessModel.findOne({ _id: id, deletedAt: null }).exec();
+  async findOne(id: Types.ObjectId, session?: ClientSession): Promise<BusinessDocument> {
+    const query = this.businessModel.findOne({ _id: id, deletedAt: null });
+    if (session) query.session(session);
+    const business = await query.exec();
     if (!business) {
       throw new NotFoundException('Business not found');
     }
@@ -104,6 +106,21 @@ export class BusinessesService {
     const business = user ? await this.findForUser(id, user) : await this.findOne(id);
     if (business.verificationStatus !== VerificationStatus.Approved) {
       throw new ForbiddenException('Business verification must be approved before campaign creation');
+    }
+    return business;
+  }
+
+  async lockApprovedForCampaign(id: Types.ObjectId, ownerId: Types.ObjectId, session: ClientSession) {
+    const business = await this.businessModel.findOneAndUpdate(
+      { _id: id, ownerId, deletedAt: null, verificationStatus: VerificationStatus.Approved },
+      { $inc: { onboardingVersion: 1 } },
+      { session, returnDocument: 'after', timestamps: false },
+    ).exec();
+    if (!business) {
+      throw new ForbiddenException({
+        code: 'BUSINESS_NOT_APPROVED',
+        message: 'The campaign must belong to an approved business.',
+      });
     }
     return business;
   }

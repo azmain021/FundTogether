@@ -73,6 +73,9 @@ export class Campaign {
   endsAt?: Date;
 
   @Prop()
+  submittedAt?: Date;
+
+  @Prop()
   firstInvestmentAt?: Date;
 
   @Prop({ type: String, enum: Object.values(CampaignStatus), default: CampaignStatus.Draft })
@@ -93,6 +96,7 @@ export class Campaign {
 export type CampaignDocument = HydratedDocument<Campaign>;
 export const CampaignSchema = SchemaFactory.createForClass(Campaign);
 CampaignSchema.index({ status: 1, createdAt: -1 });
+CampaignSchema.index({ status: 1, submittedAt: 1, _id: 1 });
 CampaignSchema.index({ ownerId: 1, status: 1, createdAt: -1 });
 CampaignSchema.index({ status: 1, endsAt: 1 });
 CampaignSchema.index({ title: 'text', description: 'text', 'businessSnapshot.name': 'text' });

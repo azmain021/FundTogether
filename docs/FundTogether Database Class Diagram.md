@@ -105,6 +105,7 @@ classDiagram
         Number totalUnits
         Number remainingUnits
         Number durationDays
+        Date submittedAt?
         Date startsAt?
         Date endsAt?
         Date firstInvestmentAt?
@@ -128,6 +129,7 @@ classDiagram
         ObjectId reviewerId
         ReviewDecision decision
         String feedback?
+        Boolean notificationPending
     }
 
     class CampaignRevision["CampaignRevision (campaign_revisions)"] {

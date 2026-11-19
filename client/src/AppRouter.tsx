@@ -16,11 +16,12 @@ const BusinessDocumentSubmission = React.lazy(() => import("./BusinessDocumentSu
 const DocumentReviewStatus = React.lazy(() => import("./DocumentReviewStatus"));
 const CampaignList = React.lazy(() => import("./campaigns/CampaignList"));
 const CampaignDraftPage = React.lazy(() => import("./campaigns/CampaignDraftPage"));
+const AdminCampaignReview = React.lazy(() => import("./campaigns/AdminCampaignReview"));
 
 const appPaths = new Set([
   "/", "/marketplace", "/login", "/register", "/forgot-password", "/reset-password",
   "/campaigns/shobuj-bazar", "/business/register", "/investor/register",
-  "/business/profile", "/business/documents", "/business/review-status", "/business/campaigns", "/investor", "/admin", "/account/security",
+  "/business/profile", "/business/documents", "/business/review-status", "/business/campaigns", "/investor", "/admin", "/admin/campaigns", "/account/security",
 ]);
 
 export default function AppRouter() {
@@ -80,6 +81,8 @@ export default function AppRouter() {
       <Route path="/business/campaigns/:id" element={<SessionGate roles={["business_owner"]}><CampaignDraftPage /></SessionGate>} />
       <Route path="/investor" element={<SessionGate roles={["investor"]}><AccountHome role="investor" /></SessionGate>} />
       <Route path="/admin" element={<SessionGate roles={["admin"]}><AccountHome role="admin" /></SessionGate>} />
+      <Route path="/admin/campaigns" element={<SessionGate roles={["admin"]}><AdminCampaignReview /></SessionGate>} />
+      <Route path="/admin/campaigns/:id" element={<SessionGate roles={["admin"]}><AdminCampaignReview /></SessionGate>} />
       <Route path="*" element={<App />} />
     </Routes>
   );
